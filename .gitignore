@@ -12,3 +12,28 @@ venv/
 .idea/
 .vscode/
 *.swp
+
+
+# Python environment and cache
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.env
+
+# AWS CDK artifacts and node modules
+cdk.out/
+node_modules/
+package-lock.json
+
+# Local test scripts or files generated during development
+out.json
+local_test.py
+
+# IDE / Editor configurations
+.vscode/
+.idea/
+*.swp
+.DS_Store
