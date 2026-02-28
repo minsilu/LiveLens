@@ -1,60 +1,14 @@
-# LiveLens API Documentation
-
-Base URL: `http://127.0.0.1:8000` (local) | App Runner URL (production)
+# LiveLens Search API Documentation
 
 > **Tip:** You can also explore all endpoints interactively via Swagger UI at `/docs`
 
 ---
 
-## Auth (`/auth`)
+## Venue Search (`GET /search/venues`)
 
-### `POST /auth/register`
-Register a new user account and receive a JWT token.
-
-**Request Body:**
-```json
-{
-  "email": "user@example.com",
-  "password": "securepassword",
-  "is_incognito": false
-}
-```
-
-**Response:**
-```json
-{
-  "message": "User registered successfully",
-  "access_token": "eyJhbGciOi...",
-  "token_type": "bearer"
-}
-```
-
-### `POST /auth/login`
-Authenticate and receive a fresh JWT token.
-
-**Request Body:**
-```json
-{
-  "email": "user@example.com",
-  "password": "securepassword"
-}
-```
-
-**Response:**
-```json
-{
-  "access_token": "eyJhbGciOi...",
-  "token_type": "bearer",
-  "message": "Login successful"
-}
-```
-
----
-
-## Search (`/search`)
-
-### `GET /search/venues`
 Search, filter, and sort venues.
+
+### Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -66,14 +20,16 @@ Search, filter, and sort venues.
 | `limit` | int | `20` | Results per page (1–100) |
 | `offset` | int | `0` | Number of results to skip |
 
-**Example Requests:**
+### Example Requests
+
 ```
 GET /search/venues?q=scotiabank
 GET /search/venues?city=Toronto&sort_by=capacity&order=desc
 GET /search/venues?min_capacity=20000&limit=10&offset=0
 ```
 
-**Response:**
+### Response
+
 ```json
 {
   "total": 4,
@@ -91,32 +47,10 @@ GET /search/venues?min_capacity=20000&limit=10&offset=0
 }
 ```
 
----
-
-## Dev Tools (`/dev`)
-
-> These endpoints are for development and testing only.
-
-### `POST /dev/generate`
-Injects ~1000 mock records (users, venues, events, seats, reviews) into the database.
-
-### `GET /dev/reviews`
-Fetch mocked reviews with venue/event/seat details.
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `limit` | int | `20` | Number of reviews to return |
-| `venue_name` | string | `Scotiabank Arena` | Filter by venue name |
-
-### `GET /dev/tables`
-List all database tables (PostgreSQL only).
-
----
-
-## Running Tests
+### Running Tests
 
 ```bash
 cd Backend
 source venv/bin/activate
-PYTHONPATH=. pytest tests/test_auth.py tests/test_search.py -v
+PYTHONPATH=. pytest tests/test_search.py -v
 ```
