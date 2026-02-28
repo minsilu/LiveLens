@@ -26,6 +26,7 @@ def health_check():
         "database": db_status
     }
 
-from .routes import mock
+from .routes import mock, auth
 
 app.include_router(mock.router, prefix="/dev", tags=["dev"])
+app.include_router(auth.router, prefix="/auth", tags=["auth"])
