@@ -16,6 +16,33 @@ We use a modern Serverless Architecture deployed using AWS App Runner and CDK.
 
 ---
 
+## 💽 Local Data Synchronization Pipelines
+
+To develop UI components or backend API logic, you need data in your local database. We provide two ways to sync data to your local SQLite database (`dev.db`).
+
+### 🌟 Pipeline 1: Instant Local Mock Data (Highly Recommended)
+This is the fastest and safest way to populate your local database with 1000 interconnected testing records (Venues, Events, Users, Reviews) in seconds.
+
+1. Start your local server: `uvicorn api.main:app --reload`
+2. Open the Swagger UI in your browser: `http://127.0.0.1:8000/docs`
+3. Expand the `POST /dev/mock-venues` endpoint and click **Try it out** -> **Execute**.
+4. Within 1 second, your local `dev.db` is populated and ready for frontend and backend component development!
+
+### ⛴️ Pipeline 2: Sync Real Data from Cloud RDS (For Debugging Real Issues)
+If you need to reproduce a production bug using a snapshot of the real AWS PostgreSQL database, use our sync script. 
+
+1. Get the production database credentials and create a `.env.prod` file in the `Backend/` directory:
+   ```env
+   PROD_DATABASE_URL=postgresql+pg8000://<user>:<password>@<rds-endpoint>:5432/<dbname>
+   ```
+2. Run the sync script from the `Backend/` directory:
+   ```bash
+   python scripts/sync_db_to_local.py
+   ```
+3. The script will securely connect to the AWS RDS, pull all data into memory, and insert it into your local `dev.db`.
+
+---
+
 ## Backend Development Workflow
 
 ### 1. Set Up Your Local Database
