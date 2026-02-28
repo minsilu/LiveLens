@@ -1,68 +1,88 @@
 # LiveLens Contribution Guide
 
-Welcome to the LiveLens team! This document outlines how we collaborate on the FastAPI backend and how your code gets deployed automatically to AWS.
+Welcome to the LiveLens team! This document outlines how we collaborate on the FastAPI backend, test our features natively, and safely deploy to the AWS cloud.
 
-## Architecture Overview
+## 🏭 Architecture Overview
 
-We use a modern Serverless Architecture deployed using AWS CDK.
-- **Backend Framework**: FastAPI (Python)
-- **Database**: PostgreSQL with PostGIS (Private AWS RDS instance)
-- **Deployment & CI/CD**: AWS App Runner connected to our GitHub repository.
-- **Infrastructure as Code**: AWS CDK (Managed by the DevOps lead)
+We use a modern Serverless Architecture deployed using AWS App Runner and CDK.
+- Backend Framework: FastAPI (Python)
+- Database: PostgreSQL with PostGIS (Private AWS RDS instance)
+- Deployment & CI/CD: AWS App Runner connected to our GitHub repository.
+- Infrastructure as Code: AWS CDK (Managed by the DevOps lead)
 
 ### Separation of Concerns
-- **Infrastructure (CDK)**: All files in the `Backend/backend/` directory, `Backend/app.py`, and `Backend/cdk.json`. Do not modify these unless you are updating cloud infrastructure.
-- **Business Logic (FastAPI)**: All files in the `Backend/api/` directory. **This is where backend developers will work.**
+- Infrastructure (CDK): Files in `Backend/backend/`, `Backend/app.py`. Do not modify these unless you are updating cloud infrastructure.
+- Business Logic (FastAPI): All files in the `Backend/api/` directory. **THIS IS WHERE YOU WILL WORK.**
 
 ---
 
-## 🛠️ Where to Write Your Code
+## Development Workflow
 
-If you are tasked with building business logic (e.g., User Login, Venue Search, Reviews), you will focus **exclusively** on the `Backend/api/` folder.
+### 1. Connecting to the Local Database
 
-### 1. `Backend/api/main.py`
-This is our FastAPI entry point. For simpler features, you can add your `router` endpoints directly here. However, as the app grows, we will split routes into separate files (e.g., `Backend/api/routes/users.py`, `Backend/api/routes/venues.py`) and include them in `main.py`.
+Our production PostgreSQL database is hidden securely behind an AWS VPC firewall. **You cannot easily connect to it locally.**
 
-### 2. `Backend/api/requirements.txt`
-If your new feature requires a third-party Python library (like `passlib` for password hashing or `PyJWT` for auth tokens), you must add the library name to this file. Our AWS CI/CD pipeline uses this file to install your dependencies during the Docker build process.
+### 🛑 DO NOT Test Against the Production Database
+- **Security**: You risk destroying real user data or mock templates.
+- **Speed**: Remote connections have severe network latency which destroys unit test performance.
+- **Network Limits**: The VPC firewall will block your connection anyway.
 
-### 3. Database Connection (`engine`)
-We use `sqlalchemy` to connect to our PostgreSQL database. The connection `engine` is already initialized in `Backend/api/main.py`.
-- **Do not hardcode database credentials.** The cloud environment automatically injects the secure `DATABASE_URL` environment variable.
-- You can import the `engine` object from `Backend/api/main.py` or use it directly in your route handlers to execute SQL queries or ORM commands.
+### ✅ The Solution: Local SQLite (Memory/File DB)
+When developing features or running tests locally, we dynamically override the `DATABASE_URL` to point to a local SQLite database. 
 
----
-
-## 💻 Local Testing & Mocking Data
-
-Because our PostgreSQL database is private and hidden beautifully behind an AWS VPC firewall, **you cannot connect your local DBeaver/DataGrip directly to the production database.**
-
-### How to test your code:
-
-**Option A - Test via API Endpoints (The Serverless Way):**
-1. Write a temporary "Mock Endpoint" in `Backend/api/main.py` (e.g., `POST /dev/mock-venues`).
-2. Push your changes to GitHub (see CI/CD below).
-3. Open our live, interactive Swagger API documentation at:  
-   `https://mufceq7fkv.us-east-2.awsapprunner.com/docs`
-4. Use the Swagger UI to execute your Mock endpoint to safely bypass the firewall and inject data into the cloud DB.
-
-**Option B - Test with Local SQLite/Postgres:**
-If you prefer not to wait for cloud deployments, you can configure your local `.env` file with a local SQLite or Postgres database URL. Replace `DATABASE_URL` with your local connection string when running `uvicorn api.main:app --reload` locally from the `Backend` directory.
+1. Create a `.env` file in the `Backend/` directory (it is gitignored).
+2. Inside `.env`, add: `DATABASE_URL=sqlite:///./dev.db`
+3. Run the server locally: `uvicorn api.main:app --reload`
 
 ---
 
-## 🚀 The CI/CD Pipeline: Pushing Your Code
+### 2. Developing New Features
+
+**Step 1: Create a feature branch**
+Always start by branching off from `main`:
+`git checkout -b feat/<your-feature-name>`
+
+**Step 2: Write modular code**
+When developing a new feature, create one or more files in the `Backend/api/routes/` directory (e.g., `auth.py`) to store your business logic. Do not dump all logic into `main.py`.
+
+**Step 3: Update dependencies**
+If your feature requires new incoming Python libraries, add them to `Backend/api/requirements.txt`.
+
+**Step 4: Mount the feature**
+We use modular routing (`app.include_router`). When you finish developing a feature route, import it and add a line to `Backend/api/main.py`:
+
+```python
+from .routes import auth
+
+# Mount the logic developed in the file `Backend/api/routes/auth.py`
+app.include_router(auth.router, prefix="/auth", tags=["auth"])
+```
+
+---
+
+### 3. 🧪 Unit Testing with Pytest
+
+Before pushing any feature (especially authentication), you must write and pass unit tests. We use `pytest` and FastAPI's `TestClient` to test endpoints without spinning up a real server.
+
+1. Ensure `pytest`, `httpx`, and `pytest-asyncio` are installed in your local virtual environment.
+2. Write tests inside the `Backend/tests/` folder (e.g., `Backend/tests/test_auth.py`).
+3. Run `pytest Backend/tests/` locally.
+
+*If your tests fail, do not push your code.*
+
+---
+
+### 4. Pushing Your Code
 
 We have an automated Continuous Integration & Continuous Deployment (CI/CD) pipeline integrated directly with GitHub. 
 
-**You do not need to run `docker build` or `cdk deploy`.**
+**Your Git Workflow:**
+1. Commit your code: `git commit -m "feat: <your feature descriptions>"`
+2. Push your current branch: `git push origin feat/<your-feature-name>`
+3. Open a Pull Request (PR) to the `main` branch on GitHub.
+4. Once approved, **Merge to `main`**.
 
-### Your Workflow:
-1. Make a new branch: `git checkout -b feat/user-login`.
-2. Write your amazing FastAPI code inside the `Backend/api/` directory.
-3. Test locally if possible, or push to GitHub and open a Pull Request (PR) to the `main` branch.
-4. **Merge to `main`**.
+Once merged, **AWS App Runner will automatically detect the change**, pull the code, execute the build step (which installs packages from `requirements.txt`), and gracefully roll out your changes in roughly 3 minutes with zero downtime. 
 
-Once your code is merged into the `main` branch, **AWS App Runner will automatically detect the change.** Within 1-2 minutes, it will automatically pull your fresh code, build the container, and perform a zero-downtime deployment to our live API!
-
-**No manual deployment commands required. Code -> Push -> Live.**
+**Summary:**
+Code -> Test Locally -> Push Branch -> Merge PR -> Auto Deploy to Live.
