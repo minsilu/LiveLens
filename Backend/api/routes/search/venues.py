@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import text
-from ..database import engine
+from ...database import engine
 from typing import Optional
 
 router = APIRouter()
@@ -29,7 +29,6 @@ def search_venues(
     if not engine:
         raise HTTPException(status_code=500, detail="Database not configured")
 
-    # Validate sort parameters
     allowed_sort_fields = {"name", "capacity", "city"}
     if sort_by not in allowed_sort_fields:
         raise HTTPException(
@@ -45,7 +44,6 @@ def search_venues(
 
     try:
         with engine.connect() as conn:
-            # Build dynamic WHERE clauses
             conditions = []
             params = {"limit": limit, "offset": offset}
 
@@ -63,11 +61,9 @@ def search_venues(
 
             where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
-            # Count total matching results (for pagination metadata)
             count_query = text(f"SELECT COUNT(*) FROM Venues {where_clause}")
             total = conn.execute(count_query, params).scalar()
 
-            # Fetch paginated results with sorting
             query = text(f"""
                 SELECT id, name, city, capacity, tags
                 FROM Venues
