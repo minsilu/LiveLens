@@ -16,7 +16,7 @@ We use a modern Serverless Architecture deployed using AWS App Runner and CDK.
 
 ---
 
-## Development Workflow
+## Backend Development Workflow
 
 ### 1. Set Up Your Local Database
 Our production PostgreSQL database is hidden securely behind an AWS VPC firewall. **You cannot easily connect to it locally.** Therefore, you must develop against a local SQLite database.
@@ -71,8 +71,58 @@ We have an automated Continuous Integration & Continuous Deployment (CI/CD) pipe
 2. Push your current branch: `git push origin feat/<your-feature-name>`
 3. Open a Pull Request (PR) to the `main` branch on GitHub.
 4. Once approved, **Merge to `main`**.
+5. search App Runner in AWS Console and check our domain name, then open it in your browser at `https://<your-domain-name>/docs` to test your new feature.
 
 Once merged, **AWS App Runner will automatically detect the change**, pull the code, execute the build step (which installs packages from `requirements.txt`), and gracefully roll out your changes in roughly 3 minutes with zero downtime. 
 
 **Summary:**
 Code -> Test Locally -> Push Branch -> Merge PR -> Auto Deploy to Live.
+
+---
+
+## Frontend Development & Deployment Workflow
+
+Our React frontend is deployed using **AWS Amplify**, which provides a fully managed CI/CD pipeline directly connected to our GitHub repository.
+
+### 1. Set Up Your Local Environment
+The frontend's template is built with Vite + React and lives in the `frontend/` directory.
+
+1. Open your terminal and navigate to the frontend folder: `cd frontend`
+2. Install dependencies: `npm install`
+3. Create a `.env` file in the `frontend/` directory (ignored by git).
+4. Inside `.env`, add this line to connect to your local backend:
+   ```env
+   VITE_API_BASE_URL=http://localhost:8000
+   ```
+   *(Note: Never hardcode `http://localhost:8000` in your React components. Always use `import.meta.env.VITE_API_BASE_URL`.)*
+
+### 2. Boot the Local Dev Server
+1. From the `frontend/` directory, run: `npm run dev`
+2. Open your browser to the local URL provided in the terminal (usually `http://localhost:5173`).
+3. Ensure your local backend is also running simultaneously to test full-stack features.
+
+### 3. Develop Your Feature
+1. **Branch Out:** Use the same feature branch convention as the backend (`git checkout -b feat/<your-feature-name>`).
+2. **Write Code:** Build React components, hook up APIs, and test locally in the browser.
+
+### 4. Pushing Your Code (CI/CD)
+Just like the backend, frontend deployment is fully automated via AWS Amplify.
+
+**Your Git Workflow:**
+1. Commit your frontend changes: `git commit -m "feat: <your feature description>"`
+2. Push your branch: `git push origin feat/<your-feature-name>`
+3. Open a Pull Request (PR) to the `main` branch.
+4. Once approved, **Merge to `main`**.
+
+**AWS Amplify Auto-Deployment:**
+Once your code is merged into `main`, AWS Amplify will automatically:
+1. Detect the change in the repository.
+2. Pull the latest code.
+3. Execute the build step (`npm run build`).
+4. Deploy the statically generated files to AWS CloudFront (CDN).
+
+
+You can monitor the deployment progress in the AWS Amplify Console. Once finished, your changes will be live globally on our Amplify domain. You can search App Amplify in AWS Console and check our domain name, then open it in your browser at `https://<your-domain-name>/docs` to see your new feature.
+
+**Summary:**
+Write Components -> Test with Local Backend -> Push Branch -> Merge PR -> Auto Deploy statically to CDN.
