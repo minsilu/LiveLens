@@ -18,56 +18,46 @@ We use a modern Serverless Architecture deployed using AWS App Runner and CDK.
 
 ## Development Workflow
 
-### 1. Connecting to the Local Database
+### 1. Set Up Your Local Database
+Our production PostgreSQL database is hidden securely behind an AWS VPC firewall. **You cannot easily connect to it locally.** Therefore, you must develop against a local SQLite database.
 
-Our production PostgreSQL database is hidden securely behind an AWS VPC firewall. **You cannot easily connect to it locally.**
+1. Create a `.env` file in the `Backend/` directory (this file is gitignored so your settings stay local).
+2. Inside `.env`, add this exact line: `DATABASE_URL=sqlite:///./dev.db`
 
-### 🛑 DO NOT Test Against the Production Database
-- **Security**: You risk destroying real user data or mock templates.
-- **Speed**: Remote connections have severe network latency which destroys unit test performance.
-- **Network Limits**: The VPC firewall will block your connection anyway.
+### 2. Boot the Local Server & Swagger UI
+Before you write any code, start your local server to ensure your environment is healthy and your local database initializes.
 
-### ✅ The Solution: Local SQLite (Memory/File DB)
-When developing features or running tests locally, we dynamically override the `DATABASE_URL` to point to a local SQLite database. 
+1. Open your terminal in the `Backend/` folder.
+2. Run: `uvicorn api.main:app --reload`
+3. Open your browser to the **Swagger UI**: `http://127.0.0.1:8000/docs`
 
-1. Create a `.env` file in the `Backend/` directory (it is gitignored).
-2. Inside `.env`, add: `DATABASE_URL=sqlite:///./dev.db`
-3. Run the server locally: `uvicorn api.main:app --reload`
+*The Swagger UI is your best friend. It allows you to manually execute and test your APIs (like logging in or generating mock data) by simply clicking buttons in the browser.*
 
----
+### 3. Develop Your Feature
+Now that your server is running and hot-reloading:
 
-### 2. Developing New Features
-
-**Step 1: Create a feature branch**
-Always start by branching off from `main`:
+**Step 1. Branch Out**
 `git checkout -b feat/<your-feature-name>`
 
-**Step 2: Write modular code**
-When developing a new feature, create one or more files in the `Backend/api/routes/` directory (e.g., `auth.py`) to store your business logic. Do not dump all logic into `main.py`.
+**Step 2. Write Modular Code**
+Create your new route files in `Backend/api/routes/` (e.g., `tickets.py`). Do not dump all logic into `main.py`.
 
-**Step 3: Update dependencies**
-If your feature requires new incoming Python libraries, add them to `Backend/api/requirements.txt`.
+**Step 3. Update Dependencies**
+If you need new packages, add them to `Backend/api/requirements.txt`.
 
-**Step 4: Mount the feature**
-We use modular routing (`app.include_router`). When you finish developing a feature route, import it and add a line to `Backend/api/main.py`:
-
+**Step 4. Mount Your Router**
+Register your new file in `Backend/api/main.py`:
 ```python
-from .routes import auth
-
-# Mount the logic developed in the file `Backend/api/routes/auth.py`
-app.include_router(auth.router, prefix="/auth", tags=["auth"])
+from .routes import tickets
+app.include_router(tickets.router, prefix="/tickets", tags=["tickets"])
 ```
+*Because the server is running with `--reload`, your new API will instantly appear on your Swagger UI page.*
 
----
+### 4. 🧪 Write & Run Unit Tests (Pytest)
+Manual testing in Swagger is great for development, but **before you push your code to the cloud, you must pass automated unit tests.**
 
-### 3. 🧪 Unit Testing with Pytest
-
-Before pushing any feature (especially authentication), you must write and pass unit tests. We use `pytest` and FastAPI's `TestClient` to test endpoints without spinning up a real server.
-
-1. Ensure `pytest`, `httpx`, and `pytest-asyncio` are installed in your local virtual environment.
-2. Write tests inside the `Backend/tests/` folder (e.g., `Backend/tests/test_auth.py`).
-3. Run `pytest Backend/tests/` locally.
-
+1. Write tests in the `Backend/tests/` folder (e.g., `Backend/tests/test_tickets.py`).
+2. Run your tests in the terminal: `pytest Backend/tests/`
 *If your tests fail, do not push your code.*
 
 ---
