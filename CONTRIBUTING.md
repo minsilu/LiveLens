@@ -20,7 +20,7 @@ We use a modern Serverless Architecture deployed using AWS App Runner and CDK.
 
 ### 1. Set Up Your Local Database
 Our production PostgreSQL database is hidden securely behind an AWS VPC firewall. **You cannot easily connect to it locally.** Therefore, you must develop against a local SQLite database.
-
+1. `pip install Beckend/api.requirement.txt`
 1. Create a `.env` file in the `Backend/` directory (this file is gitignored so your settings stay local).
 2. Inside `.env`, add this exact line: `DATABASE_URL=sqlite:///./dev.db`
 
