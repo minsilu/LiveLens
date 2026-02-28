@@ -60,7 +60,6 @@ Manual testing in Swagger is great for development, but **before you push your c
 2. Run your tests in the terminal: `pytest Backend/tests/`
 *If your tests fail, do not push your code.*
 
----
 
 ### 4. Pushing Your Code
 
