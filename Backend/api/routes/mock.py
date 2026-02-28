@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import text
 from ..database import engine
 import uuid
@@ -200,3 +201,38 @@ def list_tables():
             return {"tables": tables}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+class SQLRequest(BaseModel):
+    query: str
+
+@router.post("/sql")
+def execute_raw_sql(request: SQLRequest):
+    """
+    ⚠️ WARNING: DEVELOPMENT ONLY.
+    Executes raw SQL queries against the database and returns the results.
+    Useful for checking table counts, debugging, or fixing data directly from Swagger.
+    """
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database not configured")
+        
+    try:
+        with engine.begin() as conn:
+            # We use text() to safely wrap the raw sql string
+            result = conn.execute(text(request.query))
+            
+            # If it's a SELECT query, return the rows
+            if result.returns_rows:
+                data = [dict(row._mapping) for row in result]
+                return {
+                    "count": len(data),
+                    "results": data
+                }
+            # If it's an UPDATE/INSERT/DELETE, return the affected row count
+            else:
+                return {
+                    "rows_affected": result.rowcount, 
+                    "message": "Query executed successfully"
+                }
+                
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"SQL Execution Error: {str(e)}")
