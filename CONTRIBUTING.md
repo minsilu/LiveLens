@@ -14,42 +14,16 @@ We use a modern Serverless Architecture deployed using AWS App Runner and CDK.
 - Infrastructure (CDK): Files in `Backend/backend/`, `Backend/app.py`. Do not modify these unless you are updating cloud infrastructure.
 - Business Logic (FastAPI): All files in the `Backend/api/` directory. **THIS IS WHERE YOU WILL WORK.**
 
----
-
-## 💽 Local Data Synchronization Pipelines
-
-To develop UI components or backend API logic, you need data in your local database. We provide two ways to sync data to your local SQLite database (`dev.db`).
-
-### 🌟 Pipeline 1: Instant Local Mock Data (Highly Recommended)
-This is the fastest and safest way to populate your local database with 1000 interconnected testing records (Venues, Events, Users, Reviews) in seconds.
-
-1. Start your local server: `uvicorn api.main:app --reload`
-2. Open the Swagger UI in your browser: `http://127.0.0.1:8000/docs`
-3. Expand the `POST /dev/mock-venues` endpoint and click **Try it out** -> **Execute**.
-4. Within 1 second, your local `dev.db` is populated and ready for frontend and backend component development!
-
-### ⛴️ Pipeline 2: Sync Real Data from Cloud RDS (For Debugging Real Issues)
-If you need to reproduce a production bug using a snapshot of the real AWS PostgreSQL database, use our sync script. 
-
-1. Get the production database credentials and create a `.env.prod` file in the `Backend/` directory:
-   ```env
-   PROD_DATABASE_URL=postgresql+pg8000://<user>:<password>@<rds-endpoint>:5432/<dbname>
-   ```
-2. Run the sync script from the `Backend/` directory:
-   ```bash
-   python scripts/sync_db_to_local.py
-   ```
-3. The script will securely connect to the AWS RDS, pull all data into memory, and insert it into your local `dev.db`.
-
----
 
 ## Backend Development Workflow
 
 ### 1. Set Up Your Local Database
 Our production PostgreSQL database is hidden securely behind an AWS VPC firewall. **You cannot easily connect to it locally.** Therefore, you must develop against a local SQLite database.
 1. `pip install Beckend/api/requirement.txt`
-1. Create a `.env` file in the `Backend/` directory (this file is gitignored so your settings stay local).
-2. Inside `.env`, add this exact line: `DATABASE_URL=sqlite:///./dev.db`
+2. Create a `.env` file in the `Backend/` directory (this file is gitignored so your settings stay local).
+3. Inside `.env`, add this exact line: `DATABASE_URL=sqlite:///./dev.db`
+4. Within 1 second, your local `dev.db` is populated and ready for frontend and backend component development!
+If you need to access the real database, follow the instructions in the    [Access to Cloud Database](#access-to-cloud-database) section.
 
 ### 2. Boot the Local Server & Swagger UI
 Before you write any code, start your local server to ensure your environment is healthy and your local database initializes.
@@ -152,3 +126,58 @@ You can monitor the deployment progress in the AWS Amplify Console. Once finishe
 
 **Summary:**
 Write Components -> Test with Local Backend -> Push Branch -> Merge PR -> Auto Deploy statically to CDN.
+
+---
+
+## Access to Cloud Database
+
+This guide provides the necessary steps to connect to our PostgreSQL RDS instance from your local machine.
+
+### 1. Prerequisites
+Before attempting to connect, ensure you have the following installed:
+
+1. PostgreSQL Client: psql (CLI) or a GUI like pgAdmin / DBeaver.
+2. AWS VPN/SSO (Optional): If your organization requires SSO, ensure you are logged in via aws sso login.
+
+### 2. Network Authorization (Security Group)
+By default, the RDS instance blocks all outside traffic. You must whitelist your current IP address.
+1. Log in to the AWS Management Console.
+2. Navigate to RDS > Databases > database-1.
+3. Under the Connectivity & security tab, click the link under security groups rules. e.g., sg-08c29b4e6734cadcc -> sg-08c29b4e6734cadcc (must be the Security Group of VPC)
+4. In the Inbound rules tab, click Edit inbound rules.
+5. Add a new rule:
+   - Type: PostgreSQL
+   - Protocol: TCP
+   - Port Range: 5432
+   - Source: Select "My IP" (This automatically detects your current public IP).
+6. Click Save rules.
+
+### 3. Connection Credentials
+Use the following details to configure your connection:
+
+- Host (Endpoint): database-1.c36wyoowwijy.us-east-2.rds.amazonaws.com
+- Port: 5432
+- Database Name: postgres
+- Username: postgres
+- Password: ******** (Contact Minsi for the master password)
+
+### 4. How to Connect (Terminal)
+On Windows (PowerShell)
+First, set your environment variable, then run the connection command:
+
+```PowerShell
+$env:RDSHOST="database-1.c36wyoowwijy.us-east-2.rds.amazonaws.com
+# Connect using psql
+psql -h $env:RDSHOST -U postgres -d postgres
+# enter your pwd
+```
+On macOS / Linux
+```Bash
+export RDSHOST="database-1.c36wyoowwijy.us-east-2.rds.amazonaws.com"
+psql -h $RDSHOST -U postgres -d postgres
+# enter your pwd
+```
+### 5. Troubleshooting
+- Connection Timeout: Usually means your IP is not whitelisted in the Security Group or "Public Access" is set to No.
+- SSL Errors: If the server requires SSL, append sslmode=require to your connection string.
+- Authentication Failed: Double-check the master password and ensure there are no trailing spaces in your username.
