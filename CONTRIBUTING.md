@@ -1,68 +1,154 @@
 # LiveLens Contribution Guide
 
-Welcome to the LiveLens team! This document outlines how we collaborate on the FastAPI backend and how your code gets deployed automatically to AWS.
+Welcome to the LiveLens team! This document outlines how we collaborate on the FastAPI backend, test our features natively, and safely deploy to the AWS cloud.
 
-## Architecture Overview
+## 🏭 Architecture Overview
 
-We use a modern Serverless Architecture deployed using AWS CDK.
-- **Backend Framework**: FastAPI (Python)
-- **Database**: PostgreSQL with PostGIS (Private AWS RDS instance)
-- **Deployment & CI/CD**: AWS App Runner connected to our GitHub repository.
-- **Infrastructure as Code**: AWS CDK (Managed by the DevOps lead)
+We use a modern Serverless Architecture deployed using AWS App Runner and CDK.
+- Backend Framework: FastAPI (Python)
+- Database: PostgreSQL with PostGIS (Private AWS RDS instance)
+- Deployment & CI/CD: AWS App Runner connected to our GitHub repository.
+- Infrastructure as Code: AWS CDK (Managed by the DevOps lead)
 
 ### Separation of Concerns
-- **Infrastructure (CDK)**: All files in the `Backend/backend/` directory, `Backend/app.py`, and `Backend/cdk.json`. Do not modify these unless you are updating cloud infrastructure.
-- **Business Logic (FastAPI)**: All files in the `Backend/api/` directory. **This is where backend developers will work.**
+- Infrastructure (CDK): Files in `Backend/backend/`, `Backend/app.py`. Do not modify these unless you are updating cloud infrastructure.
+- Business Logic (FastAPI): All files in the `Backend/api/` directory. **THIS IS WHERE YOU WILL WORK.**
 
 ---
 
-## 🛠️ Where to Write Your Code
+## 💽 Local Data Synchronization Pipelines
 
-If you are tasked with building business logic (e.g., User Login, Venue Search, Reviews), you will focus **exclusively** on the `Backend/api/` folder.
+To develop UI components or backend API logic, you need data in your local database. We provide two ways to sync data to your local SQLite database (`dev.db`).
 
-### 1. `Backend/api/main.py`
-This is our FastAPI entry point. For simpler features, you can add your `router` endpoints directly here. However, as the app grows, we will split routes into separate files (e.g., `Backend/api/routes/users.py`, `Backend/api/routes/venues.py`) and include them in `main.py`.
+### 🌟 Pipeline 1: Instant Local Mock Data (Highly Recommended)
+This is the fastest and safest way to populate your local database with 1000 interconnected testing records (Venues, Events, Users, Reviews) in seconds.
 
-### 2. `Backend/api/requirements.txt`
-If your new feature requires a third-party Python library (like `passlib` for password hashing or `PyJWT` for auth tokens), you must add the library name to this file. Our AWS CI/CD pipeline uses this file to install your dependencies during the Docker build process.
+1. Start your local server: `uvicorn api.main:app --reload`
+2. Open the Swagger UI in your browser: `http://127.0.0.1:8000/docs`
+3. Expand the `POST /dev/mock-venues` endpoint and click **Try it out** -> **Execute**.
+4. Within 1 second, your local `dev.db` is populated and ready for frontend and backend component development!
 
-### 3. Database Connection (`engine`)
-We use `sqlalchemy` to connect to our PostgreSQL database. The connection `engine` is already initialized in `Backend/api/main.py`.
-- **Do not hardcode database credentials.** The cloud environment automatically injects the secure `DATABASE_URL` environment variable.
-- You can import the `engine` object from `Backend/api/main.py` or use it directly in your route handlers to execute SQL queries or ORM commands.
+### ⛴️ Pipeline 2: Sync Real Data from Cloud RDS (For Debugging Real Issues)
+If you need to reproduce a production bug using a snapshot of the real AWS PostgreSQL database, use our sync script. 
 
----
-
-## 💻 Local Testing & Mocking Data
-
-Because our PostgreSQL database is private and hidden beautifully behind an AWS VPC firewall, **you cannot connect your local DBeaver/DataGrip directly to the production database.**
-
-### How to test your code:
-
-**Option A - Test via API Endpoints (The Serverless Way):**
-1. Write a temporary "Mock Endpoint" in `Backend/api/main.py` (e.g., `POST /dev/mock-venues`).
-2. Push your changes to GitHub (see CI/CD below).
-3. Open our live, interactive Swagger API documentation at:  
-   `https://mufceq7fkv.us-east-2.awsapprunner.com/docs`
-4. Use the Swagger UI to execute your Mock endpoint to safely bypass the firewall and inject data into the cloud DB.
-
-**Option B - Test with Local SQLite/Postgres:**
-If you prefer not to wait for cloud deployments, you can configure your local `.env` file with a local SQLite or Postgres database URL. Replace `DATABASE_URL` with your local connection string when running `uvicorn api.main:app --reload` locally from the `Backend` directory.
+1. Get the production database credentials and create a `.env.prod` file in the `Backend/` directory:
+   ```env
+   PROD_DATABASE_URL=postgresql+pg8000://<user>:<password>@<rds-endpoint>:5432/<dbname>
+   ```
+2. Run the sync script from the `Backend/` directory:
+   ```bash
+   python scripts/sync_db_to_local.py
+   ```
+3. The script will securely connect to the AWS RDS, pull all data into memory, and insert it into your local `dev.db`.
 
 ---
 
-## 🚀 The CI/CD Pipeline: Pushing Your Code
+## Backend Development Workflow
+
+### 1. Set Up Your Local Database
+Our production PostgreSQL database is hidden securely behind an AWS VPC firewall. **You cannot easily connect to it locally.** Therefore, you must develop against a local SQLite database.
+1. `pip install Beckend/api/requirement.txt`
+1. Create a `.env` file in the `Backend/` directory (this file is gitignored so your settings stay local).
+2. Inside `.env`, add this exact line: `DATABASE_URL=sqlite:///./dev.db`
+
+### 2. Boot the Local Server & Swagger UI
+Before you write any code, start your local server to ensure your environment is healthy and your local database initializes.
+
+1. Open your terminal in the `Backend/` folder.
+2. Run: `uvicorn api.main:app --reload`
+3. Open your browser to the **Swagger UI**: `http://127.0.0.1:8000/docs`
+
+*The Swagger UI is your best friend. It allows you to manually execute and test your APIs (like logging in or generating mock data) by simply clicking buttons in the browser.*
+
+### 3. Develop Your Feature
+Now that your server is running and hot-reloading:
+
+**Step 1. Branch Out**
+`git checkout -b feat/<your-feature-name>`
+
+**Step 2. Write Modular Code**
+Create your new route files in `Backend/api/routes/` (e.g., `tickets.py`). Do not dump all logic into `main.py`.
+
+**Step 3. Update Dependencies**
+If you need new packages, add them to `Backend/api/requirements.txt`.
+
+**Step 4. Mount Your Router**
+Register your new file in `Backend/api/main.py`:
+```python
+from .routes import tickets
+app.include_router(tickets.router, prefix="/tickets", tags=["tickets"])
+```
+*Because the server is running with `--reload`, your new API will instantly appear on your Swagger UI page.*
+
+### 4. 🧪 Write & Run Unit Tests (Pytest)
+Manual testing in Swagger is great for development, but **before you push your code to the cloud, you must pass automated unit tests.**
+
+1. Write tests in the `Backend/tests/` folder (e.g., `Backend/tests/test_tickets.py`).
+2. Run your tests in the terminal: `pytest Backend/tests/`
+*If your tests fail, do not push your code.*
+
+
+### 4. Pushing Your Code
 
 We have an automated Continuous Integration & Continuous Deployment (CI/CD) pipeline integrated directly with GitHub. 
 
-**You do not need to run `docker build` or `cdk deploy`.**
+**Your Git Workflow:**
+1. Commit your code: `git commit -m "feat: <your feature descriptions>"`
+2. Push your current branch: `git push origin feat/<your-feature-name>`
+3. Open a Pull Request (PR) to the `main` branch on GitHub.
+4. Once approved, **Merge to `main`**.
+5. search App Runner in AWS Console and check our domain name, then open it in your browser at `https://<your-domain-name>/docs` to test your new feature.
 
-### Your Workflow:
-1. Make a new branch: `git checkout -b feat/user-login`.
-2. Write your amazing FastAPI code inside the `Backend/api/` directory.
-3. Test locally if possible, or push to GitHub and open a Pull Request (PR) to the `main` branch.
-4. **Merge to `main`**.
+Once merged, **AWS App Runner will automatically detect the change**, pull the code, execute the build step (which installs packages from `requirements.txt`), and gracefully roll out your changes in roughly 3 minutes with zero downtime. 
 
-Once your code is merged into the `main` branch, **AWS App Runner will automatically detect the change.** Within 1-2 minutes, it will automatically pull your fresh code, build the container, and perform a zero-downtime deployment to our live API!
+**Summary:**
+Code -> Test Locally -> Push Branch -> Merge PR -> Auto Deploy to Live.
 
-**No manual deployment commands required. Code -> Push -> Live.**
+---
+
+## Frontend Development & Deployment Workflow
+
+Our React frontend is deployed using **AWS Amplify**, which provides a fully managed CI/CD pipeline directly connected to our GitHub repository.
+
+### 1. Set Up Your Local Environment
+The frontend's template is built with Vite + React and lives in the `frontend/` directory.
+
+1. Open your terminal and navigate to the frontend folder: `cd frontend`
+2. Install dependencies: `npm install`
+3. Create a `.env` file in the `frontend/` directory (ignored by git).
+4. Inside `.env`, add this line to connect to your local backend:
+   ```env
+   VITE_API_BASE_URL=http://localhost:8000
+   ```
+   *(Note: Never hardcode `http://localhost:8000` in your React components. Always use `import.meta.env.VITE_API_BASE_URL`.)*
+
+### 2. Boot the Local Dev Server
+1. From the `frontend/` directory, run: `npm run dev`
+2. Open your browser to the local URL provided in the terminal (usually `http://localhost:5173`).
+3. Ensure your local backend is also running simultaneously to test full-stack features.
+
+### 3. Develop Your Feature
+1. **Branch Out:** Use the same feature branch convention as the backend (`git checkout -b feat/<your-feature-name>`).
+2. **Write Code:** Build React components, hook up APIs, and test locally in the browser.
+
+### 4. Pushing Your Code (CI/CD)
+Just like the backend, frontend deployment is fully automated via AWS Amplify.
+
+**Your Git Workflow:**
+1. Commit your frontend changes: `git commit -m "feat: <your feature description>"`
+2. Push your branch: `git push origin feat/<your-feature-name>`
+3. Open a Pull Request (PR) to the `main` branch.
+4. Once approved, **Merge to `main`**.
+
+**AWS Amplify Auto-Deployment:**
+Once your code is merged into `main`, AWS Amplify will automatically:
+1. Detect the change in the repository.
+2. Pull the latest code.
+3. Execute the build step (`npm run build`).
+4. Deploy the statically generated files to AWS CloudFront (CDN).
+
+
+You can monitor the deployment progress in the AWS Amplify Console. Once finished, your changes will be live globally on our Amplify domain. You can search App Amplify in AWS Console and check our domain name, then open it in your browser at `https://<your-domain-name>/docs` to see your new feature.
+
+**Summary:**
+Write Components -> Test with Local Backend -> Push Branch -> Merge PR -> Auto Deploy statically to CDN.
