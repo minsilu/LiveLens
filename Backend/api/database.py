@@ -29,7 +29,9 @@ if DATABASE_URL:
                   name              TEXT NOT NULL,
                   city              TEXT,
                   capacity          INTEGER,
-                  tags              TEXT
+                  tags              TEXT,
+                  seat_map_2d_url   TEXT,
+                  seat_map_meta     TEXT
                 );
             """))
             conn.execute(text("""
