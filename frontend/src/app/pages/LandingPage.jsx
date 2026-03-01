@@ -77,7 +77,7 @@ export function LandingPage() {
               </div>
               
               <Link 
-                to="/venue/1"
+                to={venues.find(v => v.name === "Scotiabank Arena")?.id ? `/venue/${venues.find(v => v.name === "Scotiabank Arena").id}` : "#"}
                 className="inline-block px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
               >
                 View Details
@@ -158,10 +158,11 @@ export function LandingPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {venues.map((venue, index) => (
-              <Link key={venue.id} to={`/venue/${venue.id}`}>
+              <Link key={venue.id} to={`/venue/${venue.id}`} state={{ venue, index }}>
                 <VenueCard venue={{
                   ...venue,
                   image: staticVenues[index % staticVenues.length].image,
+                  reviewCount: venue.review_count,
                 }} />
               </Link>
             ))}

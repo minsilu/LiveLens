@@ -1,4 +1,4 @@
-import { Star, MapPin, Users } from "lucide-react";
+import { Star, MapPin } from "lucide-react";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 
 function parseFirstTag(tags) {
@@ -42,12 +42,6 @@ export function VenueCard({ venue }) {
                 ({venue.reviewCount.toLocaleString()} reviews)
               </span>
             )}
-          </div>
-        )}
-        {venue.capacity != null && (
-          <div className="flex items-center gap-2 mb-3">
-            <Users className="w-4 h-4 text-gray-400" />
-            <span className="text-sm text-gray-400">{venue.capacity.toLocaleString()} capacity</span>
           </div>
         )}
         <div className="flex items-start gap-2 text-gray-400">

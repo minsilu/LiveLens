@@ -48,27 +48,32 @@ def search_venues(
             params = {"limit": limit, "offset": offset}
 
             if q:
-                conditions.append("(LOWER(name) LIKE :q OR LOWER(city) LIKE :q)")
+                conditions.append("(LOWER(v.name) LIKE :q OR LOWER(v.city) LIKE :q)")
                 params["q"] = f"%{q.lower()}%"
 
             if city:
-                conditions.append("LOWER(city) = :city")
+                conditions.append("LOWER(v.city) = :city")
                 params["city"] = city.lower()
 
             if min_capacity is not None:
-                conditions.append("capacity >= :min_capacity")
+                conditions.append("v.capacity >= :min_capacity")
                 params["min_capacity"] = min_capacity
 
             where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
-            count_query = text(f"SELECT COUNT(*) FROM Venues {where_clause}")
+            count_query = text(f"SELECT COUNT(*) FROM Venues v {where_clause}")
             total = conn.execute(count_query, params).scalar()
 
             query = text(f"""
-                SELECT id, name, city, capacity, tags
-                FROM Venues
+                SELECT v.id, v.name, v.city, v.capacity, v.tags,
+                       ROUND(AVG(r.overall_rating), 1) as avg_rating,
+                       COUNT(r.id) as review_count
+                FROM Venues v
+                LEFT JOIN Seats s ON s.venue_id = v.id
+                LEFT JOIN Reviews r ON r.seat_id = s.id
                 {where_clause}
-                ORDER BY {sort_by} {order}
+                GROUP BY v.id, v.name, v.city, v.capacity, v.tags
+                ORDER BY v.{sort_by} {order}
                 LIMIT :limit OFFSET :offset
             """)
             result = conn.execute(query, params)
@@ -80,6 +85,8 @@ def search_venues(
                     "city": row[2],
                     "capacity": row[3],
                     "tags": row[4],
+                    "rating": row[5],
+                    "review_count": row[6],
                 }
                 for row in result
             ]
