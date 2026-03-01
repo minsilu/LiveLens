@@ -17,13 +17,14 @@ def generate_mock_data():
     try:
         with engine.begin() as conn: # Starts a transaction
             # 1. Venues (4 venues + Scotiabank)
+            # You can place real map images in Backend/static/maps/ with these exact filenames
             venues_data = [
-                {"id": str(uuid.uuid4()), "name": "Scotiabank Arena", "city": "Toronto", "capacity": 19800, "tags": '["sports", "concerts"]'},
-                {"id": str(uuid.uuid4()), "name": "Madison Square Garden", "city": "New York", "capacity": 19500, "tags": '["sports", "concerts"]'},
-                {"id": str(uuid.uuid4()), "name": "Staples Center", "city": "Los Angeles", "capacity": 20000, "tags": '["basketball", "music"]'},
-                {"id": str(uuid.uuid4()), "name": "The O2", "city": "London", "capacity": 20000, "tags": '["arena", "historic"]'}
+                {"id": str(uuid.uuid4()), "name": "Scotiabank Arena", "city": "Toronto", "capacity": 19800, "tags": '["sports", "concerts"]', "seat_map_2d_url": "http://127.0.0.1:8000/static/maps/scotiabank_arena_map.jpg"},
+                {"id": str(uuid.uuid4()), "name": "Madison Square Garden", "city": "New York", "capacity": 19500, "tags": '["sports", "concerts"]', "seat_map_2d_url": "http://127.0.0.1:8000/static/maps/msg_map.jpg"},
+                {"id": str(uuid.uuid4()), "name": "Staples Center", "city": "Los Angeles", "capacity": 20000, "tags": '["basketball", "music"]', "seat_map_2d_url": "http://127.0.0.1:8000/static/maps/staples_center_map.jpg"},
+                {"id": str(uuid.uuid4()), "name": "The O2", "city": "London", "capacity": 20000, "tags": '["arena", "historic"]', "seat_map_2d_url": "http://127.0.0.1:8000/static/maps/the_o2_map.jpg"}
             ]
-            conn.execute(text("INSERT INTO Venues (id, name, city, capacity, tags) VALUES (:id, :name, :city, :capacity, :tags) ON CONFLICT DO NOTHING"), venues_data)
+            conn.execute(text("INSERT INTO Venues (id, name, city, capacity, tags, seat_map_2d_url) VALUES (:id, :name, :city, :capacity, :tags, :seat_map_2d_url) ON CONFLICT DO NOTHING"), venues_data)
             
             res_venues = conn.execute(text("SELECT id, name FROM Venues")).fetchall()
             venue_dict = {row[1]: str(row[0]) for row in res_venues}
@@ -112,10 +113,15 @@ def generate_mock_data():
                     
                     text_content = f"Great view from section {sec}! The sound was amazing." if overall >= 4 else f"Okay view from section {sec}, but could be better."
                     
+                    # 15% chance to have a mock image attached
+                    mock_images = '[]'
+                    if random.random() < 0.15:
+                        mock_images = f'["http://127.0.0.1:8000/static/images/mock_concert_{random.randint(1,5)}.jpg"]'
+                    
                     reviews_data.append({
                         "id": str(uuid.uuid4()), "user_id": user, "event_id": evt, "seat_id": seat,
                         "rating_visual": v_rating, "rating_sound": s_rating, "rating_value": val_rating, "overall_rating": overall,
-                        "price_paid": round(random.uniform(50.0, 500.0), 2), "text": text_content, "images": '[]',
+                        "price_paid": round(random.uniform(50.0, 500.0), 2), "text": text_content, "images": mock_images,
                         "created_at": datetime.now() - timedelta(days=random.randint(0, 365))
                     })
             
@@ -146,7 +152,8 @@ def get_mocked_reviews(limit: int = 20, venue_name: str = "Scotiabank Arena"):
             query = text("""
                 SELECT 
                     r.overall_rating, 
-                    r.text, 
+                    r.text,
+                    r.images,
                     s.section, 
                     s.row, 
                     s.seat_number, 
@@ -165,11 +172,12 @@ def get_mocked_reviews(limit: int = 20, venue_name: str = "Scotiabank Arena"):
                 {
                     "overall_rating": row[0],
                     "text": row[1],
-                    "section": row[2],
-                    "row": row[3],
-                    "seat_number": row[4],
-                    "event": row[5],
-                    "venue": row[6]
+                    "images": row[2],
+                    "section": row[3],
+                    "row": row[4],
+                    "seat_number": row[5],
+                    "event": row[6],
+                    "venue": row[7]
                 }
                 for row in result
             ]
