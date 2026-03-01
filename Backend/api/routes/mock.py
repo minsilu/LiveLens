@@ -198,14 +198,10 @@ def list_tables():
         raise HTTPException(status_code=500, detail="Database not configured")
         
     try:
+        from sqlalchemy import inspect
         with engine.connect() as conn:
-            result = conn.execute(text("""
-                SELECT table_name 
-                FROM information_schema.tables 
-                WHERE table_schema = 'public'
-                ORDER BY table_name;
-            """))
-            tables = [row[0] for row in result]
+            inspector = inspect(engine)
+            tables = inspector.get_table_names()
             return {"tables": tables}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
