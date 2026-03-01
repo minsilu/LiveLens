@@ -1,13 +1,37 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router";
-import { venues } from "../data/venues.js";
+import { venues as staticVenues } from "../data/venues.js";
 import { VenueCard } from "../components/VenueCard.jsx";
 import { Search, Music, Users, Star, TrendingUp } from "lucide-react";
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+
 export function LandingPage() {
-  // Calculate total stats
-  const totalReviews = venues.reduce((sum, venue) => sum + venue.reviewCount, 0);
-  const totalVenues = venues.length;
-  const avgRating = (venues.reduce((sum, venue) => sum + venue.rating, 0) / totalVenues).toFixed(1);
+  const [query, setQuery] = useState("");
+  const [venues, setVenues] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      const params = new URLSearchParams({ limit: "50" });
+      if (query) params.set("q", query);
+      setLoading(true);
+      fetch(`${API_BASE}/search/venues?${params}`)
+        .then((r) => r.json())
+        .then((data) => {
+          setVenues(data.results);
+          setTotal(data.total);
+        })
+        .catch(() => setVenues([]))
+        .finally(() => setLoading(false));
+    }, 150);
+    return () => clearTimeout(timeout);
+  }, [query]);
+
+  const totalReviews = staticVenues.reduce((sum, venue) => sum + venue.reviewCount, 0);
+  const totalVenues = staticVenues.length;
+  const avgRating = (staticVenues.reduce((sum, venue) => sum + venue.rating, 0) / totalVenues).toFixed(1);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900">
@@ -64,14 +88,14 @@ export function LandingPage() {
             <div className="relative">
               <div className="absolute -inset-4 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-2xl blur-2xl"></div>
               <img 
-                src={venues[0].image}
+                src={staticVenues[0].image}
                 alt="Scotiabank Arena"
                 className="relative rounded-2xl shadow-2xl w-full h-[400px] object-cover border border-white/10"
               />
               <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-md px-4 py-2 rounded-lg border border-white/20">
                 <div className="flex items-center gap-2">
                   <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                  <span className="text-white font-semibold">{venues[0].rating}</span>
+                  <span className="text-white font-semibold">{staticVenues[0].rating}</span>
                 </div>
               </div>
             </div>
@@ -119,19 +143,30 @@ export function LandingPage() {
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
               placeholder="Search venues..."
               className="w-full pl-12 pr-4 py-3 rounded-lg bg-gray-800/50 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent backdrop-blur-sm"
             />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {venues.map((venue) => (
-            <Link key={venue.id} to={`/venue/${venue.id}`}>
-              <VenueCard venue={venue} />
-            </Link>
-          ))}
-        </div>
+        {loading && venues.length === 0 ? (
+          <div className="text-center text-gray-400 py-12">Loading...</div>
+        ) : venues.length === 0 ? (
+          <div className="text-center text-gray-400 py-12">No venues found.</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {venues.map((venue, index) => (
+              <Link key={venue.id} to={`/venue/${venue.id}`}>
+                <VenueCard venue={{
+                  ...venue,
+                  image: staticVenues[index % staticVenues.length].image,
+                }} />
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
