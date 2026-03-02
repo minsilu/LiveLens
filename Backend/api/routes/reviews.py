@@ -130,9 +130,13 @@ def create_review(review: ReviewCreate, user_id: str = Depends(get_current_user)
             
             if not event_row:
                 raise HTTPException(status_code=400, detail="Invalid event_id: Event does not exist.")
-            if event_row[0] != review.venue_id:
-                raise HTTPException(status_code=400, detail="Invalid venue_id: Event does not belong to this venue.")
-                
+            # if event_row[0] != review.venue_id:
+            #     raise HTTPException(status_code=400, detail="Invalid venue_id: Event does not belong to this venue.")
+            if str(event_row[0]).strip() != str(review.venue_id).strip():
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Mismatch: DB venue {event_row[0]} vs Input venue {review.venue_id}"
+                )                
             # 3. Handle Seat (Find or Create)
             upsert_seat_query = text("""
                 INSERT INTO Seats (id, venue_id, section, row, seat_number)
