@@ -21,7 +21,7 @@ def test_local_image_upload(monkeypatch):
     # The key 'file' matches the `UploadFile = File(...)` parameter in uploads.py
     files = {"file": ("test_concert.jpg", fake_file, "image/jpeg")}
     
-    response = client.post("/upload/local", files=files)
+    response = client.post("/upload/local?review_id=test-review-123&pic_num=1", files=files)
     
     assert response.status_code == 200
     data = response.json()
@@ -57,7 +57,7 @@ def test_s3_presigned_url_generation(monkeypatch):
     import api.routes.uploads as uploads_module
     monkeypatch.setattr(uploads_module, "s3_client", MockS3Client())
 
-    response = client.get("/upload/presigned-url?filename=s3_test.png&content_type=image/png")
+    response = client.get("/upload/presigned-url?filename=s3_test.png&review_id=test-review-456&pic_num=2&content_type=image/png")
     
     assert response.status_code == 200
     data = response.json()

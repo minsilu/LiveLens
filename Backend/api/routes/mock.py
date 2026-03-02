@@ -119,7 +119,7 @@ def generate_mock_data():
                         mock_images = f'["http://127.0.0.1:8000/static/images/mock_concert_{random.randint(1,5)}.jpg"]'
                     
                     reviews_data.append({
-                        "id": str(uuid.uuid4()), "user_id": user, "event_id": evt, "seat_id": seat,
+                        "id": str(uuid.uuid4()), "user_id": user, "event_id": evt, "venue_id": v_id, "seat_id": seat,
                         "rating_visual": v_rating, "rating_sound": s_rating, "rating_value": val_rating, "overall_rating": overall,
                         "price_paid": round(random.uniform(50.0, 500.0), 2), "text": text_content, "images": mock_images,
                         "created_at": datetime.now() - timedelta(days=random.randint(0, 365))
@@ -132,8 +132,8 @@ def generate_mock_data():
                 build_reviews(ov, 650 // len(other_ids))
             
             conn.execute(text("""
-                INSERT INTO Reviews (id, user_id, event_id, seat_id, rating_visual, rating_sound, rating_value, overall_rating, price_paid, text, images, created_at) 
-                VALUES (:id, :user_id, :event_id, :seat_id, :rating_visual, :rating_sound, :rating_value, :overall_rating, :price_paid, :text, :images, :created_at) 
+                INSERT INTO Reviews (id, user_id, event_id, venue_id, seat_id, rating_visual, rating_sound, rating_value, overall_rating, price_paid, text, images, created_at) 
+                VALUES (:id, :user_id, :event_id, :venue_id, :seat_id, :rating_visual, :rating_sound, :rating_value, :overall_rating, :price_paid, :text, :images, :created_at) 
                 ON CONFLICT DO NOTHING
             """), reviews_data)
             

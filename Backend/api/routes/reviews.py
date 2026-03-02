@@ -3,7 +3,7 @@ import jwt
 import uuid
 import json
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
@@ -35,36 +35,106 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
 
 class ReviewCreate(BaseModel):
     event_id: str
-    seat_id: str
+    venue_id: str
+    section: str
+    row: str
+    seat_number: str
     rating_visual: int
     rating_sound: int
     rating_value: int
     price_paid: float
     text: str
-    images: List[str] = [] # The URLs we generated earlier via /upload/presigned-url or local
+    images: Optional[List[str]] = None # Can be omitted during initial POST
+
+class ReviewImagesUpdate(BaseModel):
+    images: List[str]
 
 @router.post("/")
 def create_review(review: ReviewCreate, user_id: str = Depends(get_current_user)):
     """
-    Submit a final review containing ratings, text, and S3 image URLs.
-    Validates JWT token to attach the review to the calling user.
+    :param review: ReviewCreate object containing event details, seat info, and image URLs.
+    Submits a comprehensive event review, links it to a seat, and calculates ratings.
+    value needed from frontend:
+    auth_token: pls include 'Authorization': `Bearer ${storedToken}`in the header, this is mandatory
+    {
+        "event_id": "594671b6-da30-41f3-ab14-447e1268a49e", #pls use the event id from the event page
+        "venue_id": "36a7f0e4-7d37-46d9-89bd-55dae360a871", #pls use the venue id from the event page
+        "section": "General Admission",
+        "row": "Front",
+        "seat_number": "101",
+        "rating_visual": 3,
+        "rating_sound": 5,
+        "rating_value": 4,
+        "price_paid": 299.99,
+        "text": "The atmosphere was electric! Postman test is working!",
+        "images": ["https://test.com/img_1.jpg", "https://test.com/img_2.jpg"] # (optional) if there are images, pls run presigned url first
+    }
+
+    ### Frontend Workflow Instructions:
+    - **IF THE REVIEW HAS IMAGES**:
+        1. The frontend must FIRST call the `/presigned url` API for each image.
+        2. Upload the files directly to S3 using the provided instructions.
+        3. Collect the resulting `future_url` strings into a list.
+        4. Pass this list into the `images` field of THIS API.
+    - **IF NO IMAGES**: Simply leave the `images` field empty or null.
+    
+    :param user_id: Automatically injected from JWT token.
+    :return: A success message, the new review_id, and the calculated overall_rating.
     """
     if not engine:
         raise HTTPException(status_code=500, detail="Database not configured")
         
     overall_rating = int(round((review.rating_visual + review.rating_sound + review.rating_value) / 3.0))
     review_id = str(uuid.uuid4())
-    images_json = json.dumps(review.images)
+    images_json = json.dumps(review.images) if review.images else None
     
     try:
         with engine.begin() as conn:
+            # 1. Validate User
+            user_exists = conn.execute(text("SELECT 1 FROM Users WHERE id = :user_id"), {"user_id": user_id}).scalar()
+            if not user_exists:
+                raise HTTPException(status_code=400, detail="Invalid user_id: User does not exist.")
+                
+            # 2. Validate Venue & Event
+            venue_exists = conn.execute(text("SELECT 1 FROM Venues WHERE id = :venue_id"), {"venue_id": review.venue_id}).scalar()
+            if not venue_exists:
+                raise HTTPException(status_code=400, detail="Invalid venue_id: Venue does not exist.")
+                
+            # We want to make sure the event actually exists and belongs to the specified venue
+            event_row = conn.execute(
+                text("SELECT venue_id FROM Events WHERE id = :event_id"), 
+                {"event_id": review.event_id}
+            ).fetchone()
+            
+            if not event_row:
+                raise HTTPException(status_code=400, detail="Invalid event_id: Event does not exist.")
+            if event_row[0] != review.venue_id:
+                raise HTTPException(status_code=400, detail="Invalid venue_id: Event does not belong to this venue.")
+                
+            # 3. Handle Seat (Find or Create)
+            upsert_seat_query = text("""
+                INSERT INTO Seats (id, venue_id, section, row, seat_number)
+                VALUES (:id, :v_id, :sec, :row, :num)
+                ON CONFLICT (venue_id, section, row, seat_number) 
+                DO UPDATE SET section = EXCLUDED.section 
+                RETURNING id;
+            """)
+
+            final_seat_id = conn.execute(upsert_seat_query, {
+                "id": str(uuid.uuid4()),
+                "v_id": review.venue_id, 
+                "sec": review.section,
+                "row": review.row,
+                "num": review.seat_number
+            }).scalar()
+
             conn.execute(text("""
                 INSERT INTO Reviews (
-                    id, user_id, event_id, seat_id,
+                    id, user_id, event_id, venue_id, seat_id,
                     rating_visual, rating_sound, rating_value, overall_rating,
                     price_paid, text, images, created_at
                 ) VALUES (
-                    :id, :user_id, :event_id, :seat_id,
+                    :id, :user_id, :event_id, :venue_id, :seat_id,
                     :r_vis, :r_snd, :r_val, :r_over,
                     :price, :text, :images, :created_at
                 )
@@ -72,7 +142,8 @@ def create_review(review: ReviewCreate, user_id: str = Depends(get_current_user)
                 "id": review_id,
                 "user_id": user_id,
                 "event_id": review.event_id,
-                "seat_id": review.seat_id,
+                "venue_id": review.venue_id,
+                "seat_id": final_seat_id,
                 "r_vis": review.rating_visual,
                 "r_snd": review.rating_sound,
                 "r_val": review.rating_value,
@@ -84,5 +155,37 @@ def create_review(review: ReviewCreate, user_id: str = Depends(get_current_user)
             })
             
             return {"message": "Review submitted successfully", "review_id": review_id, "overall_rating": overall_rating}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to submit review: {str(e)}")
+
+# @router.patch("/{review_id}/images")
+# def update_review_images(review_id: str, payload: ReviewImagesUpdate, user_id: str = Depends(get_current_user)):
+#     """
+#     Called by the frontend AFTER successfully uploading images to S3.
+#     This links the final S3 URLs back to the review.
+#     """
+#     if not engine:
+#         raise HTTPException(status_code=500, detail="Database not configured")
+        
+#     try:
+#         with engine.begin() as conn:
+#             # Verify ownership so users can't modify other people's reviews
+#             owner = conn.execute(text("SELECT user_id FROM Reviews WHERE id = :id"), {"id": review_id}).scalar()
+#             if not owner:
+#                 raise HTTPException(status_code=404, detail="Review not found")
+#             if owner != user_id:
+#                 raise HTTPException(status_code=403, detail="Not authorized to update this review's images")
+                
+#             images_json = json.dumps(payload.images)
+#             conn.execute(text("UPDATE Reviews SET images = :images WHERE id = :id"), {
+#                 "images": images_json,
+#                 "id": review_id
+#             })
+            
+#         return {"message": "Review images updated successfully"}
+#     except HTTPException:
+#         raise
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"Failed to update images: {str(e)}")

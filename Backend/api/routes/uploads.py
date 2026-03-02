@@ -3,54 +3,44 @@ import boto3
 import os
 import uuid
 from botocore.exceptions import NoCredentialsError, ClientError
+from botocore.config import Config
 
 router = APIRouter()
 
 # Read Environment Variables
-USE_LOCAL_STORAGE = os.getenv("USE_LOCAL_STORAGE", "False").lower() in ("true", "1", "t")
-S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "livelens-uploads")
+S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "livelens-images")
 AWS_REGION = os.getenv("AWS_REGION", "us-east-2")
 
 # Initialize S3 Client (only used if not local)
-s3_client = boto3.client('s3', region_name=AWS_REGION) if not USE_LOCAL_STORAGE else None
-
-@router.post("/local")
-async def upload_local_image(file: UploadFile = File(...)):
-    """
-    Local Development Only: Physically accept the file bytes and save to local disk.
-    This simulates the S3 upload process so developers can test the frontend locally.
-    """
-    if not USE_LOCAL_STORAGE:
-        raise HTTPException(status_code=403, detail="Local storage is disabled. Use /upload/presigned-url instead.")
-        
-    file_extension = file.filename.split(".")[-1]
-    unique_filename = f"{uuid.uuid4()}.{file_extension}"
-    
-    os.makedirs("static/images", exist_ok=True)
-    file_location = f"static/images/{unique_filename}"
-    
-    with open(file_location, "wb+") as file_object:
-        file_object.write(await file.read())
-        
-    return {"url": f"http://127.0.0.1:8000/static/images/{unique_filename}", "method": "local"}
+s3_client = boto3.client(
+    's3', 
+    region_name=AWS_REGION,
+    config=Config(
+        s3={'addressing_style': 'virtual'},
+        signature_version='s3v4'
+    )
+)
 
 @router.get("/presigned-url")
-def generate_s3_presigned_url(filename: str, content_type: str):
+def generate_s3_presigned_url(filename: str, review_id: str, pic_num: int, content_type: str):
     """
-    Production S3 Flow: Generates a temporary, secure "upload ticket" (Pre-signed URL).
-    The backend NEVER touches the file bytes. It just hands this ticket to the Frontend via GET,
-    and the Frontend makes a POST directly to Amazon S3.
+    Generate a pre-signed URL for the frontend to upload an image directly to S3.
+
+    - filename: Original name (e.g., "my_photo.jpg"). We only extract the extension.
+    - review_id: The UUID of the review this image belongs to.
+    - pic_num: Sequence number for multiple uploads (e.g., 1, 2, 3).
+    - content_type: The MIME type of the file. 
+        - Common values: `image/jpeg`, `image/png`, `image/webp`
+        - Tip: In JS, get this from `file.type`.
     """
-    if USE_LOCAL_STORAGE:
-        raise HTTPException(status_code=400, detail="Running in local mode. Use POST /upload/local instead.")
-        
+
     file_extension = filename.split(".")[-1]
-    unique_filename = f"{uuid.uuid4()}.{file_extension}"
+    unique_filename = f"{review_id}_{pic_num}.{file_extension}"
     
     try:
         presigned_post = s3_client.generate_presigned_post(
             Bucket=S3_BUCKET_NAME,
-            Key=f"reviews/{unique_filename}",
+            Key=f"reviews/{unique_filename}",   ### TODO: change here 
             Fields={"acl": "public-read", "Content-Type": content_type},
             Conditions=[
                 {"acl": "public-read"},
