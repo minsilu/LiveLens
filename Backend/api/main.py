@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 import os
 from dotenv import load_dotenv
 
@@ -12,9 +11,6 @@ app = FastAPI(
     description="Backend API for LiveLens, servicing the mobile and web application. Uses PostgreSQL via SQLAlchemy.",
     version="1.0.0"
 )
-
-# Mount local static files for development (Images, Maps)
-app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.add_middleware(
     CORSMiddleware,
