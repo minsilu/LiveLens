@@ -71,9 +71,9 @@ def get_events_dictionary(venue_id: Optional[str] = None):
                 date_str = str(row[2]).split(" ")[0] if row[2] else "Unknown Date"
                 display_name = f"{row[1]} ({date_str})"
                 formatted_results.append({
-                    "event_id": row[0],
+                    "event_id": str(row[0]),
                     "display_name": display_name,
-                    "venue_id": row[3]
+                    "venue_id": str(row[3])
                 })
                 
             return formatted_results
@@ -134,7 +134,7 @@ def get_venue_metadata(venue_id: str):
             available_sections = [row[0] for row in sections_result]
             
             return {
-                "venue_id": venue_row[0],
+                "venue_id": str(venue_row[0]),
                 "name": venue_row[1],
                 "seat_map_2d_url": venue_row[2],
                 "available_sections": available_sections
