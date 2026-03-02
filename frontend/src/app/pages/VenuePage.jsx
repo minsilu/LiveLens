@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useLocation, Link } from "react-router";
 import { venues as staticVenues } from "../data/venues.js";
 import { ReviewCard } from "../components/ReviewCard.jsx";
-import { Star, MapPin, ArrowLeft, ChevronDown } from "lucide-react";
+import { ReviewFormModal } from "../components/ReviewFormModal.jsx";
+import { Star, MapPin, ArrowLeft, ChevronDown, PenLine } from "lucide-react";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
@@ -23,6 +24,7 @@ export function VenuePage() {
   const [venueIndex, setVenueIndex] = useState(location.state?.index ?? 0);
   const [loading, setLoading] = useState(!venue);
   const [reviews, setReviews] = useState([]);
+  const [showReviewForm, setShowReviewForm] = useState(false);
   const [reviewSortId, setReviewSortId] = useState("relevance");
   const [reviewSortOpen, setReviewSortOpen] = useState(false);
   const reviewSortRef = useRef(null);
@@ -142,6 +144,14 @@ export function VenuePage() {
               <h2 className="text-2xl font-semibold text-white">Customer Reviews</h2>
               <p className="text-gray-400 mt-1">{reviews.length > 0 ? `${reviews.length} reviews shown` : "No reviews yet"}</p>
             </div>
+            <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowReviewForm(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              <PenLine className="w-4 h-4" />
+              Write a Review
+            </button>
             <div ref={reviewSortRef} className="relative">
               <button
                 onClick={() => setReviewSortOpen(o => !o)}
@@ -168,7 +178,12 @@ export function VenuePage() {
                 </div>
               )}
             </div>
+            </div>
           </div>
+          {showReviewForm && (
+            <ReviewFormModal venueId={venueId} onClose={() => setShowReviewForm(false)} />
+          )}
+
           <div className="space-y-4">
             {reviews.map((review) => (
               <ReviewCard

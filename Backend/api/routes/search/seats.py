@@ -17,7 +17,7 @@ def search_seats(
         description="Sort field: distance_to_stage, avg_overall, avg_price_paid, section"
     ),
     order: Optional[str] = Query("asc", description="Sort order: asc or desc"),
-    limit: int = Query(20, ge=1, le=100, description="Number of results to return"),
+    limit: int = Query(20, ge=1, le=2000, description="Number of results to return"),
     offset: int = Query(0, ge=0, description="Number of results to skip"),
 ):
     """
