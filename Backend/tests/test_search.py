@@ -493,6 +493,14 @@ def test_sort_reviews_by_price_desc(seed_reviews):
     assert prices == sorted(prices, reverse=True)
 
 
+def test_sort_reviews_by_date_desc(seed_reviews):
+    """Sort reviews by created_at descending (most recent first)."""
+    response = client.get("/search/reviews", params={"sort_by": "created_at", "order": "desc"})
+    assert response.status_code == 200
+    dates = [r["created_at"] for r in response.json()["results"]]
+    assert dates == sorted(dates, reverse=True)
+
+
 def test_sort_reviews_invalid_field(seed_reviews):
     """Invalid sort field should return 400."""
     response = client.get("/search/reviews", params={"sort_by": "user_id"})
