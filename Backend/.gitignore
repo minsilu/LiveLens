@@ -5,7 +5,6 @@ __pycache__/
 .venv/
 venv/
 env/
-.env
 
 # AWS CDK artifacts and node modules
 cdk.out/

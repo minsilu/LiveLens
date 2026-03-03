@@ -127,7 +127,7 @@ export function LandingPage() {
             <div className="relative">
               <div className="absolute -inset-4 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-2xl blur-2xl"></div>
               <img 
-                src={featuredVenue?.image_url || featuredVenue?.image || staticVenues[0].image}
+                src={"https://livelens-images.s3.us-east-2.amazonaws.com/venues/staples_center/map.png"}
                 alt={featuredVenue ? featuredVenue.name : "Scotiabank Arena"}
                 className="relative rounded-2xl shadow-2xl w-full h-[400px] object-cover border border-white/10"
               />

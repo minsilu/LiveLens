@@ -102,12 +102,13 @@ def search_venues(
             query = text(f"""
                 SELECT v.id, v.name, v.city, v.capacity, v.tags,
                        ROUND(AVG(r.overall_rating), 1) as avg_rating,
-                       COUNT(r.id) as review_count
+                       COUNT(r.id) as review_count,
+                       v.seat_map_2d_url
                 FROM Venues v
                 LEFT JOIN Seats s ON s.venue_id = v.id
                 LEFT JOIN Reviews r ON r.seat_id = s.id
                 {where_clause}
-                GROUP BY v.id, v.name, v.city, v.capacity, v.tags
+                GROUP BY v.id, v.name, v.city, v.capacity, v.tags, v.seat_map_2d_url
                 ORDER BY {"avg_rating" if sort_by == "rating" else f"v.{sort_by}"} {order}
                 LIMIT :limit OFFSET :offset
             """)
@@ -122,6 +123,7 @@ def search_venues(
                     "tags": row[4],
                     "rating": row[5],
                     "review_count": row[6],
+                    "seat_map_2d_url": row[7],
                 }
                 for row in result
             ]
