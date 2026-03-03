@@ -27,7 +27,11 @@ export function VenuePage() {
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [reviewSortId, setReviewSortId] = useState("relevance");
   const [reviewSortOpen, setReviewSortOpen] = useState(false);
+  const [sections, setSections] = useState([]);
+  const [filterSection, setFilterSection] = useState("");
+  const [sectionFilterOpen, setSectionFilterOpen] = useState(false);
   const reviewSortRef = useRef(null);
+  const sectionFilterRef = useRef(null);
 
   const reviewSortOptions = [
     { id: "relevance",     label: "Relevance",     sortBy: "overall_rating", order: "desc" },
@@ -45,10 +49,23 @@ export function VenuePage() {
       if (reviewSortRef.current && !reviewSortRef.current.contains(e.target)) {
         setReviewSortOpen(false);
       }
+      if (sectionFilterRef.current && !sectionFilterRef.current.contains(e.target)) {
+        setSectionFilterOpen(false);
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/search/seats?venue_id=${venueId}&limit=2000`)
+      .then((r) => r.json())
+      .then((data) => {
+        const unique = [...new Set((data.results ?? []).map((s) => s.section))].sort();
+        setSections(unique);
+      })
+      .catch(() => setSections([]));
+  }, [venueId]);
 
   useEffect(() => {
     if (venue) return;
@@ -65,11 +82,13 @@ export function VenuePage() {
   }, [venueId]);
 
   useEffect(() => {
-    fetch(`${API_BASE}/search/reviews?venue_id=${venueId}&limit=20&sort_by=${reviewSortBy}&order=${reviewOrder}`)
+    const params = new URLSearchParams({ venue_id: venueId, limit: 20, sort_by: reviewSortBy, order: reviewOrder });
+    if (filterSection) params.set("section", filterSection);
+    fetch(`${API_BASE}/search/reviews?${params}`)
       .then((r) => r.json())
       .then((data) => setReviews(data.results ?? []))
       .catch(() => setReviews([]));
-  }, [venueId, reviewSortBy, reviewOrder]);
+  }, [venueId, reviewSortBy, reviewOrder, filterSection]);
 
   if (loading) {
     return (
@@ -145,17 +164,40 @@ export function VenuePage() {
               <p className="text-gray-400 mt-1">{reviews.length > 0 ? `${reviews.length} reviews shown` : "No reviews yet"}</p>
             </div>
             <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowReviewForm(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
-            >
-              <PenLine className="w-4 h-4" />
-              Write a Review
-            </button>
+            <div ref={sectionFilterRef} className="relative">
+              <button
+                onClick={() => setSectionFilterOpen(o => !o)}
+                className="flex items-center justify-between gap-2 px-4 py-2 rounded-lg bg-gray-800/50 border border-gray-700 text-white hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 whitespace-nowrap w-36"
+              >
+                <span className="truncate">
+                  Section: <span className="text-gray-300">{filterSection || "All"}</span>
+                </span>
+                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${sectionFilterOpen ? "rotate-180" : ""}`} />
+              </button>
+              {sectionFilterOpen && (
+                <div className="absolute right-0 mt-2 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10 overflow-hidden max-h-56 overflow-y-auto">
+                  <button
+                    onClick={() => { setFilterSection(""); setSectionFilterOpen(false); }}
+                    className={`w-full text-left px-4 py-3 text-sm transition-colors hover:bg-gray-700 ${!filterSection ? "text-blue-400 bg-gray-700/50" : "text-gray-200"}`}
+                  >
+                    All Sections
+                  </button>
+                  {sections.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => { setFilterSection(s); setSectionFilterOpen(false); }}
+                      className={`w-full text-left px-4 py-3 text-sm transition-colors hover:bg-gray-700 ${filterSection === s ? "text-blue-400 bg-gray-700/50" : "text-gray-200"}`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <div ref={reviewSortRef} className="relative">
               <button
                 onClick={() => setReviewSortOpen(o => !o)}
-                className="flex items-center justify-between gap-2 px-4 py-2 rounded-lg bg-gray-800/50 border border-gray-700 text-white hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 whitespace-nowrap w-64"
+                className="flex items-center justify-between gap-2 px-4 py-2 rounded-lg bg-gray-800/50 border border-gray-700 text-white hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 whitespace-nowrap w-60"
               >
                 <span className="truncate">Sort by: <span className="text-gray-300">{activeSort.label}</span></span>
                 <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${reviewSortOpen ? "rotate-180" : ""}`} />
@@ -184,15 +226,28 @@ export function VenuePage() {
             <ReviewFormModal venueId={venueId} onClose={() => setShowReviewForm(false)} />
           )}
 
+          <div className="flex justify-end mb-4">
+            <button
+              onClick={() => setShowReviewForm(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              <PenLine className="w-4 h-4" />
+              Write a Review
+            </button>
+          </div>
+
           <div className="space-y-4">
             {reviews.map((review) => (
               <ReviewCard
                 key={review.id}
                 review={{
                   author: "Verified Attendee",
-                  seatInfo: review.section && review.row ? `Section ${review.section}, Row ${review.row}` : null,
+                  seatInfo: review.section && review.row ? `Section ${review.section}, Row ${review.row}${review.seat_number ? `, Seat ${review.seat_number}` : ""}` : null,
                   date: review.created_at ?? new Date().toISOString(),
                   rating: review.overall_rating,
+                  ratingVisual: review.rating_visual,
+                  ratingSound: review.rating_sound,
+                  ratingValue: review.rating_value,
                   comment: review.text ?? "",
                 }}
               />

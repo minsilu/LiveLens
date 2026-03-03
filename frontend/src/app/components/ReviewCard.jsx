@@ -28,7 +28,7 @@ export function ReviewCard({ review }) {
               {formatDate(review.date)}
             </span>
           </div>
-          <div className="flex items-center gap-1 mb-3">
+          <div className="flex items-center gap-1 mb-2">
             {[...Array(5)].map((_, index) => (
               <Star
                 key={index}
@@ -40,6 +40,19 @@ export function ReviewCard({ review }) {
               />
             ))}
           </div>
+          {(review.ratingVisual || review.ratingSound || review.ratingValue) && (
+            <div className="flex items-center gap-3 mb-3">
+              {[
+                { label: "Visual", value: review.ratingVisual },
+                { label: "Sound", value: review.ratingSound },
+                { label: "Value", value: review.ratingValue },
+              ].map(({ label, value }) => value != null && (
+                <span key={label} className="text-xs text-gray-500">
+                  {label} <span className="text-gray-300">{value}/5</span>
+                </span>
+              ))}
+            </div>
+          )}
           <p className="text-gray-300 leading-relaxed">{review.comment}</p>
         </div>
       </div>
