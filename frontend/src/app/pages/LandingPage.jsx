@@ -1,13 +1,57 @@
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router";
-import { venues } from "../data/venues.js";
+import { venues as staticVenues } from "../data/venues.js";
 import { VenueCard } from "../components/VenueCard.jsx";
-import { Search, Music, Users, Star, TrendingUp } from "lucide-react";
+import { Search, Music, Users, Star, TrendingUp, ChevronDown } from "lucide-react";
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
 export function LandingPage() {
-  // Calculate total stats
-  const totalReviews = venues.reduce((sum, venue) => sum + venue.reviewCount, 0);
-  const totalVenues = venues.length;
-  const avgRating = (venues.reduce((sum, venue) => sum + venue.rating, 0) / totalVenues).toFixed(1);
+  const [query, setQuery] = useState("");
+  const [venues, setVenues] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [sortBy, setSortBy] = useState("name");
+  const [order, setOrder] = useState("asc");
+  // "name asc" = Relevance (default), "rating desc" = Rating
+  const [sortOpen, setSortOpen] = useState(false);
+  const sortRef = useRef(null);
+
+  const sortOptions = [
+    { label: "Relevance", sortBy: "name", order: "asc" },
+    { label: "Rating", sortBy: "rating", order: "desc" },
+  ];
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (sortRef.current && !sortRef.current.contains(e.target)) {
+        setSortOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      const params = new URLSearchParams({ limit: "50", sort_by: sortBy, order });
+      if (query) params.set("q", query);
+      setLoading(true);
+      fetch(`${API_BASE}/search/venues?${params}`)
+        .then((r) => r.json())
+        .then((data) => {
+          setVenues(data.results);
+          setTotal(data.total);
+        })
+        .catch(() => setVenues([]))
+        .finally(() => setLoading(false));
+    }, 150);
+    return () => clearTimeout(timeout);
+  }, [query, sortBy, order]);
+
+  const totalReviews = staticVenues.reduce((sum, venue) => sum + venue.reviewCount, 0);
+  const totalVenues = staticVenues.length;
+  const avgRating = (staticVenues.reduce((sum, venue) => sum + venue.rating, 0) / totalVenues).toFixed(1);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900">
@@ -53,7 +97,7 @@ export function LandingPage() {
               </div>
               
               <Link 
-                to="/venue/1"
+                to={venues.find(v => v.name === "Scotiabank Arena")?.id ? `/venue/${venues.find(v => v.name === "Scotiabank Arena").id}` : "#"}
                 className="inline-block px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
               >
                 View Details
@@ -64,14 +108,14 @@ export function LandingPage() {
             <div className="relative">
               <div className="absolute -inset-4 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-2xl blur-2xl"></div>
               <img 
-                src={venues[0].image}
+                src={staticVenues[0].image}
                 alt="Scotiabank Arena"
                 className="relative rounded-2xl shadow-2xl w-full h-[400px] object-cover border border-white/10"
               />
               <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-md px-4 py-2 rounded-lg border border-white/20">
                 <div className="flex items-center gap-2">
                   <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                  <span className="text-white font-semibold">{venues[0].rating}</span>
+                  <span className="text-white font-semibold">{staticVenues[0].rating}</span>
                 </div>
               </div>
             </div>
@@ -114,24 +158,64 @@ export function LandingPage() {
           </p>
         </div>
 
-        <div className="mb-8 max-w-2xl mx-auto">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search venues..."
-              className="w-full pl-12 pr-4 py-3 rounded-lg bg-gray-800/50 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent backdrop-blur-sm"
-            />
+        <div className="mb-8 max-w-4xl mx-auto">
+          <div className="flex gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search venues..."
+                className="w-full pl-12 pr-4 py-3 rounded-lg bg-gray-800/50 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent backdrop-blur-sm"
+              />
+            </div>
+            <div ref={sortRef} className="relative">
+              <button
+                onClick={() => setSortOpen(o => !o)}
+                className="flex items-center justify-between gap-2 px-4 py-3 rounded-lg bg-gray-800/50 border border-gray-700 text-white hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 backdrop-blur-sm whitespace-nowrap w-48"
+              >
+                <span>Sort by: <span className="text-gray-300">{sortOptions.find(o => o.sortBy === sortBy && o.order === order)?.label ?? "Relevance"}</span></span>
+                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${sortOpen ? "rotate-180" : ""}`} />
+              </button>
+              {sortOpen && (
+                <div className="absolute right-0 mt-2 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10 overflow-hidden">
+                  {sortOptions.map((opt) => (
+                    <button
+                      key={`${opt.sortBy}-${opt.order}`}
+                      onClick={() => { setSortBy(opt.sortBy); setOrder(opt.order); setSortOpen(false); }}
+                      className={`w-full text-left px-4 py-3 text-sm transition-colors hover:bg-gray-700 ${
+                        sortBy === opt.sortBy && order === opt.order
+                          ? "text-blue-400 bg-gray-700/50"
+                          : "text-gray-200"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {venues.map((venue) => (
-            <Link key={venue.id} to={`/venue/${venue.id}`}>
-              <VenueCard venue={venue} />
-            </Link>
-          ))}
-        </div>
+        {loading && venues.length === 0 ? (
+          <div className="text-center text-gray-400 py-12">Loading...</div>
+        ) : venues.length === 0 ? (
+          <div className="text-center text-gray-400 py-12">No venues found.</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {venues.map((venue, index) => (
+              <Link key={venue.id} to={`/venue/${venue.id}`} state={{ venue, index }}>
+                <VenueCard venue={{
+                  ...venue,
+                  image: staticVenues[index % staticVenues.length].image,
+                  reviewCount: venue.review_count,
+                }} />
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

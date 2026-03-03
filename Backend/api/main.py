@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 import os
 from dotenv import load_dotenv
 
@@ -7,8 +8,16 @@ load_dotenv()
 
 app = FastAPI(
     title="LiveLens API",
-    description="The backend API for the LiveLens application.",
+    description="Backend API for LiveLens, servicing the mobile and web application. Uses PostgreSQL via SQLAlchemy.",
     version="1.0.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # TODO: change to specific origins
+    allow_credentials=True,
+    allow_methods=["*"], # TODO: change to specific methods
+    allow_headers=["*"], # TODO: change to specific headers
 )
 
 @app.get("/")
@@ -17,17 +26,16 @@ def read_root():
 
 @app.get("/health")
 def health_check():
-    # Attempt to read database URL just to verify env var presence (optional)
-    db_url = os.getenv("DATABASE_URL")
-    db_status = "Connected (simulated)" if db_url else "No DATABASE_URL configured"
-    
+    from .database import engine
+    db_status = "Connected" if engine else "Not Configured"
     return {
         "status": "healthy",
         "database": db_status
     }
 
-from .routes import mock, auth, search
-
+from .routes import mock, auth, reviews, search
+# TODO: Add more routers here
 app.include_router(mock.router, prefix="/dev", tags=["dev"])
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
+app.include_router(reviews.router, prefix="/reviews", tags=["reviews"])
 app.include_router(search.router, prefix="/search", tags=["search"])

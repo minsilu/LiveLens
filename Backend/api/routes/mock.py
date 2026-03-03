@@ -17,13 +17,14 @@ def generate_mock_data():
     try:
         with engine.begin() as conn: # Starts a transaction
             # 1. Venues (4 venues + Scotiabank)
+            # You can place real map images in Backend/static/maps/ with these exact filenames
             venues_data = [
-                {"id": str(uuid.uuid4()), "name": "Scotiabank Arena", "city": "Toronto", "capacity": 19800, "tags": '["sports", "concerts"]', "image_url": "https://images.unsplash.com/photo-1771911651651-e70a9eed91d1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb25jZXJ0JTIwaGFsbCUyMHZlbnVlfGVufDF8fHx8MTc3MjMzMzM0OHww&ixlib=rb-4.1.0&q=80&w=1080"},
-                {"id": str(uuid.uuid4()), "name": "Madison Square Garden", "city": "New York", "capacity": 19500, "tags": '["sports", "concerts"]', "image_url": "https://images.unsplash.com/photo-1727096857692-e9dadf2bc92e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtdXNpYyUyMGZlc3RpdmFsJTIwc3RhZ2V8ZW58MXx8fHwxNzcyMzA2MDI3fDA&ixlib=rb-4.1.0&q=80&w=1080"},
-                {"id": str(uuid.uuid4()), "name": "Staples Center", "city": "Los Angeles", "capacity": 20000, "tags": '["basketball", "music"]', "image_url": "https://images.unsplash.com/photo-1630782863310-26f710fcbe31?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxqYXp6JTIwY2x1YiUyMGludGVyaW9yfGVufDF8fHx8MTc3MjMzMzM0OXww&ixlib=rb-4.1.0&q=80&w=1080"},
-                {"id": str(uuid.uuid4()), "name": "The O2", "city": "London", "capacity": 20000, "tags": '["arena", "historic"]', "image_url": "https://images.unsplash.com/photo-1771196888811-cc164e759780?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxuaWdodGNsdWIlMjBkYW5jZSUyMGZsb29yfGVufDF8fHx8MTc3MjMwNTQzM3ww&ixlib=rb-4.1.0&q=80&w=1080"}
+                {"id": str(uuid.uuid4()), "name": "Scotiabank Arena", "city": "Toronto", "capacity": 19800, "tags": '["sports", "concerts"]', "seat_map_2d_url": "http://127.0.0.1:8000/static/maps/scotiabank_arena_map.jpg"},
+                {"id": str(uuid.uuid4()), "name": "Madison Square Garden", "city": "New York", "capacity": 19500, "tags": '["sports", "concerts"]', "seat_map_2d_url": "http://127.0.0.1:8000/static/maps/msg_map.jpg"},
+                {"id": str(uuid.uuid4()), "name": "Staples Center", "city": "Los Angeles", "capacity": 20000, "tags": '["basketball", "music"]', "seat_map_2d_url": "http://127.0.0.1:8000/static/maps/staples_center_map.jpg"},
+                {"id": str(uuid.uuid4()), "name": "The O2", "city": "London", "capacity": 20000, "tags": '["arena", "historic"]', "seat_map_2d_url": "http://127.0.0.1:8000/static/maps/the_o2_map.jpg"}
             ]
-            conn.execute(text("INSERT INTO Venues (id, name, city, capacity, tags, image_url) VALUES (:id, :name, :city, :capacity, :tags, :image_url) ON CONFLICT DO NOTHING"), venues_data)
+            conn.execute(text("INSERT INTO Venues (id, name, city, capacity, tags, seat_map_2d_url) VALUES (:id, :name, :city, :capacity, :tags, :seat_map_2d_url) ON CONFLICT DO NOTHING"), venues_data)
             
             res_venues = conn.execute(text("SELECT id, name FROM Venues")).fetchall()
             venue_dict = {row[1]: str(row[0]) for row in res_venues}
@@ -112,10 +113,15 @@ def generate_mock_data():
                     
                     text_content = f"Great view from section {sec}! The sound was amazing." if overall >= 4 else f"Okay view from section {sec}, but could be better."
                     
+                    # 15% chance to have a mock image attached
+                    mock_images = '[]'
+                    if random.random() < 0.15:
+                        mock_images = f'["http://127.0.0.1:8000/static/images/mock_concert_{random.randint(1,5)}.jpg"]'
+                    
                     reviews_data.append({
-                        "id": str(uuid.uuid4()), "user_id": user, "event_id": evt, "seat_id": seat,
+                        "id": str(uuid.uuid4()), "user_id": user, "event_id": evt, "venue_id": v_id, "seat_id": seat,
                         "rating_visual": v_rating, "rating_sound": s_rating, "rating_value": val_rating, "overall_rating": overall,
-                        "price_paid": round(random.uniform(50.0, 500.0), 2), "text": text_content, "images": '[]',
+                        "price_paid": round(random.uniform(50.0, 500.0), 2), "text": text_content, "images": mock_images,
                         "created_at": datetime.now() - timedelta(days=random.randint(0, 365))
                     })
             
@@ -126,8 +132,8 @@ def generate_mock_data():
                 build_reviews(ov, 650 // len(other_ids))
             
             conn.execute(text("""
-                INSERT INTO Reviews (id, user_id, event_id, seat_id, rating_visual, rating_sound, rating_value, overall_rating, price_paid, text, images, created_at) 
-                VALUES (:id, :user_id, :event_id, :seat_id, :rating_visual, :rating_sound, :rating_value, :overall_rating, :price_paid, :text, :images, :created_at) 
+                INSERT INTO Reviews (id, user_id, event_id, venue_id, seat_id, rating_visual, rating_sound, rating_value, overall_rating, price_paid, text, images, created_at) 
+                VALUES (:id, :user_id, :event_id, :venue_id, :seat_id, :rating_visual, :rating_sound, :rating_value, :overall_rating, :price_paid, :text, :images, :created_at) 
                 ON CONFLICT DO NOTHING
             """), reviews_data)
             
@@ -146,7 +152,8 @@ def get_mocked_reviews(limit: int = 20, venue_name: str = "Scotiabank Arena"):
             query = text("""
                 SELECT 
                     r.overall_rating, 
-                    r.text, 
+                    r.text,
+                    r.images,
                     s.section, 
                     s.row, 
                     s.seat_number, 
@@ -165,11 +172,12 @@ def get_mocked_reviews(limit: int = 20, venue_name: str = "Scotiabank Arena"):
                 {
                     "overall_rating": row[0],
                     "text": row[1],
-                    "section": row[2],
-                    "row": row[3],
-                    "seat_number": row[4],
-                    "event": row[5],
-                    "venue": row[6]
+                    "images": row[2],
+                    "section": row[3],
+                    "row": row[4],
+                    "seat_number": row[5],
+                    "event": row[6],
+                    "venue": row[7]
                 }
                 for row in result
             ]
@@ -190,14 +198,10 @@ def list_tables():
         raise HTTPException(status_code=500, detail="Database not configured")
         
     try:
+        from sqlalchemy import inspect
         with engine.connect() as conn:
-            result = conn.execute(text("""
-                SELECT table_name 
-                FROM information_schema.tables 
-                WHERE table_schema = 'public'
-                ORDER BY table_name;
-            """))
-            tables = [row[0] for row in result]
+            inspector = inspect(engine)
+            tables = inspector.get_table_names()
             return {"tables": tables}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

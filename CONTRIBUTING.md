@@ -139,29 +139,20 @@ Before attempting to connect, ensure you have the following installed:
 1. PostgreSQL Client: psql (CLI) or a GUI like pgAdmin / DBeaver.
 2. AWS VPN/SSO (Optional): If your organization requires SSO, ensure you are logged in via aws sso login.
 
-### 2. Network Authorization (Security Group)
-By default, the RDS instance blocks all outside traffic. You must whitelist your current IP address.
-1. Log in to the AWS Management Console.
-2. Navigate to RDS > Databases > database-1.
-3. Under the Connectivity & security tab, click the link under security groups rules. e.g., sg-08c29b4e6734cadcc -> sg-08c29b4e6734cadcc (must be the Security Group of VPC)
-4. In the Inbound rules tab, click Edit inbound rules.
-5. Add a new rule:
-   - Type: PostgreSQL
-   - Protocol: TCP
-   - Port Range: 5432
-   - Source: Select "My IP" (This automatically detects your current public IP).
-6. Click Save rules.
-
-### 3. Connection Credentials
+### 2. Connection Credentials
 Use the following details to configure your connection:
 
 - Host (Endpoint): database-1.c36wyoowwijy.us-east-2.rds.amazonaws.com
 - Port: 5432
 - Database Name: postgres
 - Username: postgres
-- Password: ******** (Contact Minsi for the master password)
+- Password: 12345678 (Contact Minsi for the master password)
 
-### 4. How to Connect (Terminal)
+Inside `.env`, just set your DATABASE_URL=postgresql://postgres:12345678@database-1.c36wyoowwijy.us-east-2.rds.amazonaws.com:5432/postgres
+
+Then you can test the api which will query the data through cloud database.
+
+### 4. How to Connect the database directly (not just through api)
 On Windows (PowerShell)
 First, set your environment variable, then run the connection command:
 
