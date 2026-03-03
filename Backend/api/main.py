@@ -33,10 +33,11 @@ def health_check():
         "database": db_status
     }
 
-from .routes import mock, auth, reviews, review_options, search
+from .routes import mock, auth, reviews, review_options, search, ai
 # TODO: Add more routers here
 app.include_router(mock.router, prefix="/dev", tags=["dev"])
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(reviews.router, prefix="/reviews", tags=["reviews"])
 app.include_router(review_options.router, prefix="/review-form", tags=["review-form"])
 app.include_router(search.router, prefix="/search", tags=["search"])
+app.include_router(ai.router, prefix="/ai", tags=["ai"])
