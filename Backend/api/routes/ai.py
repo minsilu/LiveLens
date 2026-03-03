@@ -29,7 +29,7 @@ async def analyze_data(request: AnalyzeRequest):
     
     try:
         # Determine the model to use. flash is usually the best for general fast analysis.
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
         # Format the input data
         formatted_input = ""
