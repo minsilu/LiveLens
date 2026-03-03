@@ -11,6 +11,7 @@ def search_reviews(
     seat_id: Optional[str] = Query(None, description="Filter by seat ID"),
     event_id: Optional[str] = Query(None, description="Filter by event ID"),
     venue_id: Optional[str] = Query(None, description="Filter by venue ID"),
+    section: Optional[str] = Query(None, description="Filter by seat section"),
     min_rating: Optional[int] = Query(None, ge=1, le=5, description="Minimum overall rating (1-5)"),
     sort_by: Optional[str] = Query("created_at", description="Sort field: overall_rating, created_at, price_paid"),
     order: Optional[str] = Query("desc", description="Sort order: asc or desc"),
@@ -61,6 +62,10 @@ def search_reviews(
                 conditions.append("e.venue_id = :venue_id")
                 params["venue_id"] = venue_id
 
+            if section:
+                conditions.append("LOWER(s.section) = :section")
+                params["section"] = section.lower()
+
             if min_rating is not None:
                 conditions.append("r.overall_rating >= :min_rating")
                 params["min_rating"] = min_rating
@@ -80,7 +85,7 @@ def search_reviews(
                 SELECT r.id, r.user_id, r.event_id, r.seat_id,
                        r.rating_visual, r.rating_sound, r.rating_value, r.overall_rating,
                        r.price_paid, r.text, r.created_at,
-                       s.section, s.row
+                       s.section, s.row, s.seat_number
                 FROM Reviews r
                 LEFT JOIN Events e ON r.event_id = e.id
                 LEFT JOIN Seats s ON r.seat_id = s.id
@@ -105,6 +110,7 @@ def search_reviews(
                     "created_at": row[10],
                     "section": row[11],
                     "row": row[12],
+                    "seat_number": row[13],
                 }
                 for row in result
             ]
