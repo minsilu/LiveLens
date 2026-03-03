@@ -237,12 +237,21 @@ export function ReviewFormModal({ venueId, onClose }) {
               />
               <span className="text-sm text-gray-400">Post review anonymously</span>
             </label>
-            <button
-              type="submit"
-              className="w-full md:w-auto px-10 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-lg shadow-blue-500/20 transition-all active:scale-95"
-            >
-              Post Review
-            </button>
+            <div className="flex gap-3 w-full md:w-auto">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 md:flex-none px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-lg transition-all active:scale-95"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="flex-1 md:flex-none px-10 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-lg shadow-blue-500/20 transition-all active:scale-95"
+              >
+                Post Review
+              </button>
+            </div>
           </div>
 
         </form>

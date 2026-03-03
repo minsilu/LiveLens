@@ -222,10 +222,6 @@ export function VenuePage() {
             </div>
             </div>
           </div>
-          {showReviewForm && (
-            <ReviewFormModal venueId={venueId} onClose={() => setShowReviewForm(false)} />
-          )}
-
           <div className="flex justify-end mb-4">
             <button
               onClick={() => setShowReviewForm(true)}
@@ -235,6 +231,14 @@ export function VenuePage() {
               Write a Review
             </button>
           </div>
+
+          {showReviewForm && (
+            <ReviewFormModal venueId={venueId} onClose={() => {
+              const y = window.scrollY;
+              setShowReviewForm(false);
+              requestAnimationFrame(() => window.scrollTo(0, y));
+            }} />
+          )}
 
           <div className="space-y-4">
             {reviews.map((review) => (

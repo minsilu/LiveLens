@@ -526,3 +526,33 @@ def test_reviews_pagination(seed_reviews):
 
     assert len(page_reviews) <= 2
     assert page_reviews[0]["overall_rating"] == all_reviews[2]["overall_rating"]
+
+
+# ---------------------------------------------------------------------------
+# New fields: seat_map_2d_url, seat_map_meta in venues / images in reviews
+# ---------------------------------------------------------------------------
+
+def test_venues_response_has_url_fields():
+    """Venues response should include seat_map_2d_url and seat_map_meta fields."""
+    response = client.get("/search/venues", params={"q": "TestVenue", "limit": 1})
+    assert response.status_code == 200
+    venue = response.json()["results"][0]
+    assert "seat_map_2d_url" in venue
+    assert "seat_map_meta" in venue
+
+
+def test_reviews_response_has_images_field(seed_reviews):
+    """Reviews response should include images field."""
+    response = client.get("/search/reviews", params={"limit": 1})
+    assert response.status_code == 200
+    review = response.json()["results"][0]
+    assert "images" in review
+
+
+def test_filter_reviews_by_section(seed_reviews):
+    """Filter reviews by section should return only reviews from that section."""
+    response = client.get("/search/reviews", params={"section": "Floor"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] >= 1
+    assert all(r["section"] == "Floor" for r in data["results"])

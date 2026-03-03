@@ -84,7 +84,7 @@ def search_reviews(
             query = text(f"""
                 SELECT r.id, r.user_id, r.event_id, r.seat_id,
                        r.rating_visual, r.rating_sound, r.rating_value, r.overall_rating,
-                       r.price_paid, r.text, r.created_at,
+                       r.price_paid, r.text, r.images, r.created_at,
                        s.section, s.row, s.seat_number
                 FROM Reviews r
                 LEFT JOIN Events e ON r.event_id = e.id
@@ -107,10 +107,11 @@ def search_reviews(
                     "overall_rating": row[7],
                     "price_paid": row[8],
                     "text": row[9],
-                    "created_at": row[10],
-                    "section": row[11],
-                    "row": row[12],
-                    "seat_number": row[13],
+                    "images": row[10],
+                    "created_at": row[11],
+                    "section": row[12],
+                    "row": row[13],
+                    "seat_number": row[14],
                 }
                 for row in result
             ]
