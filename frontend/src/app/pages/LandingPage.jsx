@@ -11,6 +11,13 @@ export function LandingPage() {
   const [venues, setVenues] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [featuredVenue, setFeaturedVenue] = useState(null);
+  const [stats, setStats] = useState({
+    totalVenues: 0,
+    totalReviews: 0,
+    avgRating: "0.0",
+    satisfaction: 98
+  });
   const [sortBy, setSortBy] = useState("name");
   const [order, setOrder] = useState("asc");
   // "name asc" = Relevance (default), "rating desc" = Rating
@@ -33,6 +40,20 @@ export function LandingPage() {
   }, []);
 
   useEffect(() => {
+    fetch(`${API_BASE}/search/venues/stats`)
+      .then((r) => r.json())
+      .then((data) => {
+        setStats({
+          totalVenues: data.total_venues || 0,
+          totalReviews: data.total_reviews || 0,
+          avgRating: typeof data.avg_rating === 'number' ? data.avg_rating.toFixed(1) : "0.0",
+          satisfaction: data.satisfaction || 98
+        });
+      })
+      .catch((e) => console.error("Failed to fetch stats", e));
+  }, []);
+
+  useEffect(() => {
     const timeout = setTimeout(() => {
       const params = new URLSearchParams({ limit: "50", sort_by: sortBy, order });
       if (query) params.set("q", query);
@@ -42,16 +63,14 @@ export function LandingPage() {
         .then((data) => {
           setVenues(data.results);
           setTotal(data.total);
+          const scotiabank = data.results.find(v => v.name === "Scotiabank Arena" || v.name === "Scotiabank");
+          if (scotiabank) setFeaturedVenue(scotiabank);
         })
         .catch(() => setVenues([]))
         .finally(() => setLoading(false));
     }, 150);
     return () => clearTimeout(timeout);
   }, [query, sortBy, order]);
-
-  const totalReviews = staticVenues.reduce((sum, venue) => sum + venue.reviewCount, 0);
-  const totalVenues = staticVenues.length;
-  const avgRating = (staticVenues.reduce((sum, venue) => sum + venue.rating, 0) / totalVenues).toFixed(1);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900">
@@ -83,21 +102,21 @@ export function LandingPage() {
               {/* Stats Grid */}
               <div className="grid grid-cols-3 gap-6 mb-8">
                 <div className="text-center p-4 bg-white/5 rounded-lg backdrop-blur-sm border border-white/10">
-                  <div className="text-3xl font-bold text-blue-400 mb-1">3.2K+</div>
+                  <div className="text-3xl font-bold text-blue-400 mb-1">{featuredVenue ? featuredVenue.review_count : "-"}</div>
                   <div className="text-sm text-gray-400">Reviews</div>
                 </div>
                 <div className="text-center p-4 bg-white/5 rounded-lg backdrop-blur-sm border border-white/10">
-                  <div className="text-3xl font-bold text-purple-400 mb-1">4.7</div>
+                  <div className="text-3xl font-bold text-purple-400 mb-1">{featuredVenue ? featuredVenue.rating : "-"}</div>
                   <div className="text-sm text-gray-400">Rating</div>
                 </div>
                 <div className="text-center p-4 bg-white/5 rounded-lg backdrop-blur-sm border border-white/10">
-                  <div className="text-3xl font-bold text-pink-400 mb-1">19K</div>
+                  <div className="text-3xl font-bold text-pink-400 mb-1">{featuredVenue ? (featuredVenue.capacity >= 1000 ? (featuredVenue.capacity/1000).toFixed(1) + "K" : featuredVenue.capacity) : "-"}</div>
                   <div className="text-sm text-gray-400">Capacity</div>
                 </div>
               </div>
               
               <Link 
-                to={venues.find(v => v.name === "Scotiabank Arena")?.id ? `/venue/${venues.find(v => v.name === "Scotiabank Arena").id}` : "#"}
+                to={featuredVenue ? `/venue/${featuredVenue.id}` : "#"}
                 className="inline-block px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
               >
                 View Details
@@ -108,14 +127,14 @@ export function LandingPage() {
             <div className="relative">
               <div className="absolute -inset-4 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-2xl blur-2xl"></div>
               <img 
-                src={staticVenues[0].image}
-                alt="Scotiabank Arena"
+                src={featuredVenue?.image_url || featuredVenue?.image || staticVenues[0].image}
+                alt={featuredVenue ? featuredVenue.name : "Scotiabank Arena"}
                 className="relative rounded-2xl shadow-2xl w-full h-[400px] object-cover border border-white/10"
               />
               <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-md px-4 py-2 rounded-lg border border-white/20">
                 <div className="flex items-center gap-2">
                   <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                  <span className="text-white font-semibold">{staticVenues[0].rating}</span>
+                  <span className="text-white font-semibold">{featuredVenue ? featuredVenue.rating : "-"}</span>
                 </div>
               </div>
             </div>
@@ -128,22 +147,22 @@ export function LandingPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-16">
           <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 p-6 rounded-xl border border-blue-500/20">
             <Music className="w-10 h-10 text-blue-400 mb-3" />
-            <div className="text-3xl font-bold text-white mb-1">{totalVenues}</div>
+            <div className="text-3xl font-bold text-white mb-1">{stats.totalVenues}</div>
             <div className="text-gray-400">Music Venues</div>
           </div>
           <div className="bg-gradient-to-br from-purple-500/10 to-purple-600/5 p-6 rounded-xl border border-purple-500/20">
             <Users className="w-10 h-10 text-purple-400 mb-3" />
-            <div className="text-3xl font-bold text-white mb-1">{totalReviews.toLocaleString()}</div>
+            <div className="text-3xl font-bold text-white mb-1">{stats.totalReviews.toLocaleString()}</div>
             <div className="text-gray-400">Total Reviews</div>
           </div>
           <div className="bg-gradient-to-br from-pink-500/10 to-pink-600/5 p-6 rounded-xl border border-pink-500/20">
             <Star className="w-10 h-10 text-pink-400 mb-3" />
-            <div className="text-3xl font-bold text-white mb-1">{avgRating}</div>
+            <div className="text-3xl font-bold text-white mb-1">{stats.avgRating}</div>
             <div className="text-gray-400">Average Rating</div>
           </div>
           <div className="bg-gradient-to-br from-green-500/10 to-green-600/5 p-6 rounded-xl border border-green-500/20">
             <TrendingUp className="w-10 h-10 text-green-400 mb-3" />
-            <div className="text-3xl font-bold text-white mb-1">98%</div>
+            <div className="text-3xl font-bold text-white mb-1">{stats.satisfaction}%</div>
             <div className="text-gray-400">Satisfaction</div>
           </div>
         </div>

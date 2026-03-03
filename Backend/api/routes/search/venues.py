@@ -5,6 +5,41 @@ from typing import Optional
 
 router = APIRouter()
 
+@router.get("/venues/stats")
+def get_venue_stats():
+    """Get aggregated platform stats for all venues."""
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    try:
+        with engine.connect() as conn:
+            query = text("""
+                SELECT 
+                    COUNT(DISTINCT v.id) as total_venues,
+                    COUNT(r.id) as total_reviews,
+                    COALESCE(ROUND(AVG(r.overall_rating), 1), 0) as avg_rating
+                FROM Venues v
+                LEFT JOIN Seats s ON s.venue_id = v.id
+                LEFT JOIN Reviews r ON r.seat_id = s.id
+            """)
+            row = conn.execute(query).fetchone()
+            
+            # Simple assumption for satisfaction (e.g. % of reviews > 3)
+            # Just mimicking the frontend static for now or calculate:
+            # For simplicity, returning static 98 if missing, or based on avg_rating
+            satisfaction = min(100, max(0, int((float(row[2]) / 5.0) * 100))) if row[2] else 0
+            if row[1] == 0:
+                satisfaction = 100 # default
+                
+            return {
+                "total_venues": row[0],
+                "total_reviews": row[1],
+                "avg_rating": row[2],
+                "satisfaction": satisfaction
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 
 @router.get("/venues")
 def search_venues(

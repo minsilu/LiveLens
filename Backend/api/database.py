@@ -34,6 +34,11 @@ if DATABASE_URL:
                   seat_map_meta     TEXT
                 );
             """))
+            # Auto-migrate local DB for image_url
+            try:
+                conn.execute(text("ALTER TABLE Venues ADD COLUMN image_url TEXT;"))
+            except Exception:
+                pass # Column already exists
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS Events (
                   id                TEXT PRIMARY KEY,
