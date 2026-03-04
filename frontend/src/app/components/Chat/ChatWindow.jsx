@@ -5,6 +5,7 @@ const ChatWindow = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const toggleChat = () => {
     setIsOpen(!isOpen);
@@ -14,12 +15,37 @@ const ChatWindow = () => {
     if (input.trim() === '') return;
 
     const userMessage = { sender: 'user', text: input };
-    setMessages([...messages, userMessage]);
+    setMessages(prevMessages => [...prevMessages, userMessage]);
     setInput('');
+    setIsLoading(true);
 
-    // TODO: Call backend API
-    const botMessage = { sender: 'bot', text: 'This is a response from the bot.' };
-    setMessages(prevMessages => [...prevMessages, botMessage]);
+    try {
+      const response = await fetch('/api/ai/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          input_data: input,
+          instructions: "You are a helpful assistant for the LiveLens application. Please answer the user's questions clearly and concisely."
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('API Error');
+      }
+
+      const data = await response.json();
+      const botMessage = { sender: 'bot', text: data.analysis };
+      setMessages(prevMessages => [...prevMessages, botMessage]);
+
+    } catch (error) {
+      console.error("Failed to send message:", error);
+      const errorMessage = { sender: 'bot', text: 'Sorry, I am having trouble connecting. Please try again later.' };
+      setMessages(prevMessages => [...prevMessages, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (!isOpen) {
@@ -42,16 +68,20 @@ const ChatWindow = () => {
             {msg.text}
           </div>
         ))}
+        {isLoading && <div className="message bot">...</div>}
       </div>
       <div className="chat-input">
         <input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+          onKeyPress={(e) => e.key === 'Enter' && !isLoading && handleSend()}
           placeholder="Type a message..."
+          disabled={isLoading}
         />
-        <button onClick={handleSend}>Send</button>
+        <button onClick={handleSend} disabled={isLoading}>
+          {isLoading ? '...' : 'Send'}
+        </button>
       </div>
     </div>
   );
