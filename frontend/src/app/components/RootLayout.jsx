@@ -1,4 +1,5 @@
 import { Outlet, Link } from "react-router";
+import ChatWindow from "./Chat/ChatWindow";
 
 export function RootLayout() {
   return (
@@ -30,6 +31,7 @@ export function RootLayout() {
       <main>
         <Outlet />
       </main>
+      <ChatWindow />
     </div>
   );
 }
