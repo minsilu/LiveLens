@@ -9,3 +9,5 @@ Efe fedogana@uwaterloo.ca
 Minsi Lu minsi.lu@uwaterloo.ca
 
 Alex Qian l38qian@uwaterloo.ca
+
+Yao Wang y4564wan@uwaterloo.ca
