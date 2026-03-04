@@ -6,9 +6,7 @@ __pycache__/
 *.db
 *.sqlite3
 *.log
-.env
 venv/
-.env.*
 .idea/
 .vscode/
 *.swp
@@ -21,7 +19,6 @@ __pycache__/
 .venv/
 venv/
 env/
-.env
 
 # AWS CDK artifacts and node modules
 cdk.out/
