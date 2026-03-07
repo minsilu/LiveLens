@@ -1,7 +1,7 @@
 fastapi==0.111.0
 uvicorn==0.29.0
-sqlalchemy==2.0.30
-psycopg2-binary==2.9.9
+sqlalchemy>=2.0.32
+psycopg2-binary>=2.9.10
 python-dotenv==1.0.1
 pg8000
 bcrypt

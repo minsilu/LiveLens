@@ -10,6 +10,7 @@ venv/
 .idea/
 .vscode/
 *.swp
+.agents
 
 
 # Python environment and cache
