@@ -253,6 +253,7 @@ export function VenuePage() {
                   ratingSound: review.rating_sound,
                   ratingValue: review.rating_value,
                   comment: review.text ?? "",
+                  images: review.images ?? null,
                 }}
               />
             ))}
