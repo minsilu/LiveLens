@@ -47,6 +47,10 @@ if DATABASE_URL:
                 conn.execute(text("ALTER TABLE Venues ADD COLUMN seat_map_2d_url TEXT;"))
             except Exception:
                 pass # Column already exists
+            try:
+                conn.execute(text("ALTER TABLE Reviews ADD COLUMN venue_id TEXT REFERENCES Venues(id);"))
+            except Exception:
+                pass # Column already exists
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS Events (
                   id                TEXT PRIMARY KEY,
