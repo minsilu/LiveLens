@@ -1,6 +1,14 @@
+import { useState } from "react";
 import { Star, User } from "lucide-react";
+import { ImageLightbox } from "./ImageLightbox";
 
 export function ReviewCard({ review }) {
+  const [lightboxIndex, setLightboxIndex] = useState(null);
+  const images = (() => {
+    if (!review.images) return [];
+    if (Array.isArray(review.images)) return review.images;
+    try { return JSON.parse(review.images); } catch { return []; }
+  })();
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
@@ -54,6 +62,25 @@ export function ReviewCard({ review }) {
             </div>
           )}
           <p className="text-gray-300 leading-relaxed">{review.comment}</p>
+          {images.length > 0 && (
+            <div className="flex gap-2 flex-wrap mt-3">
+              {images.map((url, i) => (
+                <img
+                  key={i}
+                  src={url}
+                  onClick={() => setLightboxIndex(i)}
+                  className="w-20 h-16 object-cover rounded-lg cursor-pointer border border-gray-700 hover:border-blue-500 transition-colors"
+                />
+              ))}
+            </div>
+          )}
+          {lightboxIndex !== null && (
+            <ImageLightbox
+              images={images}
+              startIndex={lightboxIndex}
+              onClose={() => setLightboxIndex(null)}
+            />
+          )}
         </div>
       </div>
     </div>

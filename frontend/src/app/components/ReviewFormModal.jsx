@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { X, Star, Camera, ChevronDown } from "lucide-react";
+import { ImageLightbox } from "./ImageLightbox";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
@@ -100,6 +101,9 @@ export function ReviewFormModal({ venueId, onClose }) {
   const [ratingValue, setRatingValue] = useState(0);
   const [reviewText, setReviewText] = useState("");
   const [isAnonymous, setIsAnonymous] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [lightboxIndex, setLightboxIndex] = useState(null);
+  const fileInputRef = useRef(null);
 
   const numSort = (a, b) => (isNaN(a) || isNaN(b) ? a.localeCompare(b) : Number(a) - Number(b));
   const sections = [...new Set(seats.map((s) => s.section))].sort(numSort);
@@ -118,9 +122,83 @@ export function ReviewFormModal({ venueId, onClose }) {
       .catch(() => setSeats([]));
   }, [venueId]);
 
-  function handleSubmit(e) {
+  function handleFileChange(e) {
+    const files = Array.from(e.target.files);
+    const remaining = 5 - selectedFiles.length;
+    const toAdd = files.slice(0, remaining).map((file) => ({
+      file,
+      preview: URL.createObjectURL(file),
+    }));
+    setSelectedFiles((prev) => [...prev, ...toAdd]);
+    e.target.value = "";
+  }
+
+  function removeFile(index) {
+    setSelectedFiles((prev) => {
+      URL.revokeObjectURL(prev[index].preview);
+      return prev.filter((_, i) => i !== index);
+    });
+  }
+
+  async function handleSubmit(e) {
     e.preventDefault();
-    // TODO: connect to POST /reviews/ with JWT token
+    const token = localStorage.getItem("token");
+    if (!token) return alert("Please log in to post a review.");
+
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+
+    const res = await fetch(`${API_BASE}/reviews/`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        event_id: eventId,
+        venue_id: venueId,
+        section,
+        row,
+        seat_number: seatNumber,
+        rating_visual: ratingVisual,
+        rating_sound: ratingSound,
+        rating_value: ratingValue,
+        price_paid: 0,
+        text: reviewText,
+      }),
+    });
+    if (!res.ok) return alert("Failed to submit review.");
+    const { review_id } = await res.json();
+
+    if (selectedFiles.length > 0) {
+      const imageUrls = [];
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const { file } = selectedFiles[i];
+        const params = new URLSearchParams({
+          review_id,
+          pic_num: i + 1,
+          filename: file.name,
+          content_type: file.type,
+        });
+        const urlRes = await fetch(`${API_BASE}/reviews/img-presigned-url?${params}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!urlRes.ok) continue;
+        const { upload_instructions, future_url } = await urlRes.json();
+
+        const formData = new FormData();
+        Object.entries(upload_instructions.fields).forEach(([k, v]) => formData.append(k, v));
+        formData.append("file", file);
+        await fetch(upload_instructions.url, { method: "POST", body: formData });
+        imageUrls.push(future_url);
+      }
+
+      if (imageUrls.length > 0) {
+        await fetch(`${API_BASE}/reviews/img-database?review_id=${review_id}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({ images: imageUrls }),
+        });
+      }
+    }
+
+    onClose();
   }
 
   return (
@@ -215,15 +293,54 @@ export function ReviewFormModal({ venueId, onClose }) {
               className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
             />
             <div className="flex items-center gap-3">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={handleFileChange}
+              />
               <button
                 type="button"
-                className="flex items-center gap-2 px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-sm text-gray-300 hover:bg-gray-700 transition-colors"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={selectedFiles.length >= 5}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-sm text-gray-300 hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Camera className="w-4 h-4" />
                 Add Photos
               </button>
-              <span className="text-xs text-gray-500">Max 5 images. High quality preferred.</span>
+              <span className="text-xs text-gray-500">
+                {selectedFiles.length}/5 images selected.
+              </span>
             </div>
+            {selectedFiles.length > 0 && (
+              <div className="flex gap-2 flex-wrap mt-2">
+                {selectedFiles.map((f, i) => (
+                  <div key={i} className="relative group">
+                    <img
+                      src={f.preview}
+                      onClick={() => setLightboxIndex(i)}
+                      className="w-20 h-16 object-cover rounded-lg cursor-pointer border border-gray-600 hover:border-blue-500 transition-colors"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeFile(i)}
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gray-900 border border-gray-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-3 h-3 text-gray-300" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {lightboxIndex !== null && (
+              <ImageLightbox
+                images={selectedFiles.map((f) => f.preview)}
+                startIndex={lightboxIndex}
+                onClose={() => setLightboxIndex(null)}
+              />
+            )}
           </section>
 
           {/* Footer */}

@@ -74,6 +74,7 @@ def handler(event, context):
           id                UUID PRIMARY KEY,
           user_id           UUID REFERENCES Users(id),
           event_id          UUID REFERENCES Events(id),
+          venue_id          UUID REFERENCES Venues(id),
           seat_id           UUID REFERENCES Seats(id),
 
           rating_visual     INTEGER,
