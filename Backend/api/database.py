@@ -91,6 +91,15 @@ if DATABASE_URL:
                 );
             """))
             conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS ReviewDrafts (
+                  id                TEXT PRIMARY KEY,
+                  user_id           TEXT REFERENCES Users(id),
+                  draft_data        TEXT,
+                  created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """))
+            conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS SeatAggregates (
                   seat_id           TEXT PRIMARY KEY REFERENCES Seats(id),
                   avg_visual        FLOAT,
