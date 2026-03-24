@@ -19,6 +19,7 @@ __pycache__/
 .venv/
 venv/
 env/
+livelens/
 
 # AWS CDK artifacts and node modules
 cdk.out/
