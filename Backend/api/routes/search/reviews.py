@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import text
 from ...database import engine
 from typing import Optional
+import json
 
 router = APIRouter()
 
@@ -84,7 +85,7 @@ def search_reviews(
             query = text(f"""
                 SELECT r.id, r.user_id, r.event_id, r.seat_id,
                        r.rating_visual, r.rating_sound, r.rating_value, r.overall_rating,
-                       r.price_paid, r.text, r.images, r.created_at,
+                       r.price_paid, r.text, r.images, r.tags, r.created_at,
                        s.section, s.row, s.seat_number
                 FROM Reviews r
                 LEFT JOIN Events e ON r.event_id = e.id
@@ -95,8 +96,17 @@ def search_reviews(
             """)
             result = conn.execute(query, params)
 
-            reviews = [
-                {
+            reviews = []
+            for row in result:
+                # Parse tags safely, handling both string (SQLite) and object (Postgres JSONB)
+                tags_data = row[11]
+                if isinstance(tags_data, str):
+                    try:
+                        tags_data = json.loads(tags_data)
+                    except json.JSONDecodeError:
+                        tags_data = []
+
+                reviews.append({
                     "id": row[0],
                     "user_id": row[1],
                     "event_id": row[2],
@@ -108,13 +118,12 @@ def search_reviews(
                     "price_paid": row[8],
                     "text": row[9],
                     "images": row[10],
-                    "created_at": row[11],
-                    "section": row[12],
-                    "row": row[13],
-                    "seat_number": row[14],
-                }
-                for row in result
-            ]
+                    "tags": tags_data,
+                    "created_at": row[12],
+                    "section": row[13],
+                    "row": row[14],
+                    "seat_number": row[15],
+                })
 
             return {
                 "total": total,

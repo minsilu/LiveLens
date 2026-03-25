@@ -15,6 +15,7 @@ from sqlalchemy import text
 
 from ..database import engine
 from ..auth_utils import SECRET_KEY, ALGORITHM
+from ..utils.zhipu_client import extract_tags
 
 # S3 Configuration
 S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "livelens-images")
@@ -110,6 +111,10 @@ def create_review(review: ReviewCreate, user_id: str = Depends(get_current_user)
     review_id = str(uuid.uuid4())
     images_json = json.dumps(review.images) if review.images else None
     
+    # Generate AI tags for this review text
+    extracted_tags = extract_tags(review.text)
+    tags_json = json.dumps(extracted_tags) if extracted_tags else None
+    
     try:
         with engine.begin() as conn:
             # 1. Validate User
@@ -158,11 +163,11 @@ def create_review(review: ReviewCreate, user_id: str = Depends(get_current_user)
                 INSERT INTO Reviews (
                     id, user_id, event_id, venue_id, seat_id,
                     rating_visual, rating_sound, rating_value, overall_rating,
-                    price_paid, text, images, created_at
+                    price_paid, text, images, tags, created_at
                 ) VALUES (
                     :id, :user_id, :event_id, :venue_id, :seat_id,
                     :r_vis, :r_snd, :r_val, :r_over,
-                    :price, :text, :images, :created_at
+                    :price, :text, :images, :tags, :created_at
                 )
             """), {
                 "id": review_id,
@@ -177,6 +182,7 @@ def create_review(review: ReviewCreate, user_id: str = Depends(get_current_user)
                 "price": review.price_paid,
                 "text": review.text,
                 "images": images_json,
+                "tags": tags_json,
                 "created_at": datetime.utcnow()
             })
 
@@ -206,7 +212,12 @@ def create_review(review: ReviewCreate, user_id: str = Depends(get_current_user)
                 "now": datetime.utcnow()
             })
             
-            return {"message": "Review submitted successfully", "review_id": review_id, "overall_rating": overall_rating}
+            return {
+                "message": "Review submitted successfully", 
+                "review_id": review_id, 
+                "overall_rating": overall_rating,
+                "tags": extracted_tags
+            }
     except HTTPException:
         raise
     except Exception as e:
