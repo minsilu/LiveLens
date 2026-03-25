@@ -179,6 +179,32 @@ def create_review(review: ReviewCreate, user_id: str = Depends(get_current_user)
                 "images": images_json,
                 "created_at": datetime.utcnow()
             })
+
+            # 4. Update SeatAggregates
+            conn.execute(text("""
+                INSERT INTO SeatAggregates (
+                    seat_id, avg_visual, avg_sound, avg_value, avg_overall, avg_price_paid, 
+                    review_count, last_updated
+                ) VALUES (
+                    :seat_id, :v, :s, :val, :o, :p, 1, :now
+                )
+                ON CONFLICT (seat_id) DO UPDATE SET
+                    avg_visual = (SeatAggregates.avg_visual * SeatAggregates.review_count + EXCLUDED.avg_visual) / (SeatAggregates.review_count + 1),
+                    avg_sound = (SeatAggregates.avg_sound * SeatAggregates.review_count + EXCLUDED.avg_sound) / (SeatAggregates.review_count + 1),
+                    avg_value = (SeatAggregates.avg_value * SeatAggregates.review_count + EXCLUDED.avg_value) / (SeatAggregates.review_count + 1),
+                    avg_overall = (SeatAggregates.avg_overall * SeatAggregates.review_count + EXCLUDED.avg_overall) / (SeatAggregates.review_count + 1),
+                    avg_price_paid = (SeatAggregates.avg_price_paid * SeatAggregates.review_count + EXCLUDED.avg_price_paid) / (SeatAggregates.review_count + 1),
+                    review_count = SeatAggregates.review_count + 1,
+                    last_updated = EXCLUDED.last_updated;
+            """), {
+                "seat_id": final_seat_id,
+                "v": float(review.rating_visual),
+                "s": float(review.rating_sound),
+                "val": float(review.rating_value),
+                "o": float(overall_rating),
+                "p": float(review.price_paid),
+                "now": datetime.utcnow()
+            })
             
             return {"message": "Review submitted successfully", "review_id": review_id, "overall_rating": overall_rating}
     except HTTPException:
