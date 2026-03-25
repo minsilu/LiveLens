@@ -33,7 +33,36 @@ class ReviewDraft(BaseModel):
 @router.post("/")
 def save_draft(draft: ReviewDraft, user_id: str = Depends(get_current_user)):
     """
-    Saves or updates a review draft for the logged-in user.
+    Saves a new ongoing review draft or updates an existing one for the authenticated user.
+
+    ### Functionality:
+    - This endpoint acts as an **Upsert** (Update or Insert) mechanism.
+    - If `draft.id` is provided and exists in the database, it updates the stored content.
+    - If `draft.id` is null or does not exist, it generates a new UUID and creates a record.
+    - Ensures security by verifying that only the owner of a draft can update it via the `user_id` check.
+
+    ### Input (Request Body):
+    - **draft**: `ReviewDraft` (Pydantic Model)
+        - `id`: Optional[str] - The UUID of the draft. Pass `null` for new drafts.
+        - `draft_data`: dict - A JSON object containing partial review info (e.g., event_id, text, ratings).
+    - **user_id**: `str` - Extracted automatically from the **JWT Bearer Token** in the header.
+
+    ### Output (Response):
+    - **Success (200 OK)**:
+        ```json
+        {
+            "message": "Draft saved successfully",
+            "draft_id": "550e8400-e29b-41d4-a716-446655440000"
+        }
+        ```
+    - **Failure (500/401)**:
+        - `500`: Database connection issues or SQL execution errors.
+        - `401`: Missing or invalid authentication token.
+
+    ---
+    :param draft: The draft object containing the ID and the data payload.
+    :param user_id: The unique identifier of the user (from token dependency).
+    :return: A dictionary containing a confirmation message and the draft UUID.
     """
     if not engine:
         raise HTTPException(status_code=500, detail="Database not configured")
@@ -79,7 +108,37 @@ def save_draft(draft: ReviewDraft, user_id: str = Depends(get_current_user)):
 @router.get("/")
 def get_drafts(user_id: str = Depends(get_current_user)):
     """
-    Retrieves all drafts for the logged-in user.
+    Fetches all review drafts associated with the currently authenticated user.
+    This endpoint is used to populate a 'Drafts' or 'Continue Writing' list in the frontend.
+
+    ### 1. Mandatory Header (Authentication)
+    - **Authorization**: `Bearer <JWT_TOKEN>`
+    - The `user_id` is automatically extracted from the token's 'sub' claim via the `get_current_user` dependency.
+    
+    ### 2. Response Format (Returns a List of Objects)
+    Returns a `List[Dict]` where each object represents a draft:
+    ```json
+    [
+      {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "draft_data": {
+          "event_id": "...",
+          "text": "The view was...",
+          "rating_visual": 5
+        },
+        "created_at": "2026-03-24T14:30:00",
+        "updated_at": "2026-03-24T15:45:00"
+      }
+    ]
+    ```
+
+    ### 3. Exceptions
+    - **500 Internal Server Error**: Raised if the database engine is not initialized or if a SQL execution error occurs.
+    - **401 Unauthorized**: Raised if the JWT is missing, invalid, or expired (via `get_current_user`).
+
+    ---
+    :param user_id: (Injected) The unique identifier of the user requesting their data.
+    :return: A list of sanitized draft objects sorted by the latest update.
     """
     if not engine:
         raise HTTPException(status_code=500, detail="Database not configured")
@@ -116,7 +175,15 @@ def get_drafts(user_id: str = Depends(get_current_user)):
 @router.delete("/delete")
 def delete_draft(draft_id: str, user_id: str = Depends(get_current_user)):
     """
-    Discards a specific draft for the user.
+    Deletes a user's review draft.
+
+    - **Args**: 
+        - `draft_id` (Query Param, UUID string): The unique ID of the draft to delete.
+        - `user_id` (Injected): Extracted from JWT for ownership verification.
+    
+    - **Action**: Removes the record from `ReviewDrafts` only if it belongs to the requester.
+    
+    - **Returns**: A success message or 404 if the draft is missing/unauthorized.
     """
     if not engine:
         raise HTTPException(status_code=500, detail="Database not configured")
