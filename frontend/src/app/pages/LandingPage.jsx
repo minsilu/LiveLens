@@ -22,6 +22,7 @@ export function LandingPage() {
   const [order, setOrder] = useState("asc");
   // "name asc" = Relevance (default), "rating desc" = Rating
   const [sortOpen, setSortOpen] = useState(false);
+  const [featuredImageIndex, setFeaturedImageIndex] = useState(0);
   const sortRef = useRef(null);
 
   const sortOptions = [
@@ -38,6 +39,14 @@ export function LandingPage() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!featuredVenue || !featuredVenue.image_urls || featuredVenue.image_urls.length <= 1) return;
+    const interval = setInterval(() => {
+      setFeaturedImageIndex(prev => (prev + 1) % featuredVenue.image_urls.length);
+    }, 4000); // Change image every 4 seconds
+    return () => clearInterval(interval);
+  }, [featuredVenue]);
 
   useEffect(() => {
     fetch(`${API_BASE}/search/venues/stats`)
@@ -123,14 +132,54 @@ export function LandingPage() {
               </Link>
             </div>
             
-            {/* Right side - Image */}
+            {/* Right side - Image Slideshow */}
             <div className="relative">
               <div className="absolute -inset-4 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-2xl blur-2xl"></div>
-              <img 
-                src={featuredVenue?.image_url || featuredVenue?.image || staticVenues[0].image}
-                alt={featuredVenue ? featuredVenue.name : "Scotiabank Arena"}
-                className="relative rounded-2xl shadow-2xl w-full h-[400px] object-cover border border-white/10"
-              />
+              {featuredVenue && featuredVenue.image_urls && featuredVenue.image_urls.length > 0 ? (
+                <div className="relative w-full h-[400px] overflow-hidden rounded-2xl shadow-2xl border border-white/10">
+                  {featuredVenue.image_urls.map((url, i) => (
+                    <img
+                      key={url}
+                      src={url}
+                      alt={`${featuredVenue.name} - ${i}`}
+                      onError={(e) => {
+                         if (!e.target.dataset.retried) {
+                            e.target.dataset.retried = 'true';
+                            if (e.target.src.endsWith('.png')) e.target.src = e.target.src.replace('.png', '.jpg');
+                            else if (e.target.src.endsWith('.jpg')) e.target.src = e.target.src.replace('.jpg', '.png');
+                         }
+                      }}
+                      className={`absolute inset-0 w-full h-[400px] object-cover transition-opacity duration-1000 ${
+                        i === featuredImageIndex ? "opacity-100 relative" : "opacity-0 absolute"
+                      }`}
+                    />
+                  ))}
+                  {/* Indicators */}
+                  {featuredVenue.image_urls.length > 1 && (
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+                      {featuredVenue.image_urls.map((_, i) => (
+                        <div 
+                          key={i} 
+                          className={`w-2 h-2 rounded-full transition-colors ${i === featuredImageIndex ? 'bg-white' : 'bg-white/40'}`}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <img 
+                  src={featuredVenue?.image_url || featuredVenue?.image || staticVenues[0].image}
+                  alt={featuredVenue ? featuredVenue.name : "Scotiabank Arena"}
+                  onError={(e) => {
+                     if (!e.target.dataset.retried) {
+                        e.target.dataset.retried = 'true';
+                        if (e.target.src.endsWith('.png')) e.target.src = e.target.src.replace('.png', '.jpg');
+                        else if (e.target.src.endsWith('.jpg')) e.target.src = e.target.src.replace('.jpg', '.png');
+                     }
+                  }}
+                  className="relative rounded-2xl shadow-2xl w-full h-[400px] object-cover border border-white/10"
+                />
+              )}
               <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-md px-4 py-2 rounded-lg border border-white/20">
                 <div className="flex items-center gap-2">
                   <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
@@ -228,7 +277,7 @@ export function LandingPage() {
               <Link key={venue.id} to={`/venue/${venue.id}`} state={{ venue, index }}>
                 <VenueCard venue={{
                   ...venue,
-                  image: staticVenues[index % staticVenues.length].image,
+                  image: venue.image_url,
                   reviewCount: venue.review_count,
                 }} />
               </Link>
