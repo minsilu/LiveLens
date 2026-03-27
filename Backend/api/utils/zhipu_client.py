@@ -55,13 +55,16 @@ def extract_tags(review_text: str) -> List[str]:
     )
 
     try:
+        print(f"DEBUG: Starting ZhipuAI request (review length: {len(review_text)} characters)...")
         response = client.chat.completions.create(
-            model="glm-4",  # You can change to a faster/cheaper model if needed, like glm-3-turbo
+            model="glm-4",
             messages=[
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.3, # Lower temperature for more consistent, deterministic JSON output
+            temperature=0.3,
+            timeout=60, # Increased timeout for cloud environment
         )
+        print("DEBUG: ZhipuAI response received.")
         
         # Extract the content from the response
         content = response.choices[0].message.content
@@ -69,16 +72,22 @@ def extract_tags(review_text: str) -> List[str]:
         # Clean the response in case the model adds markdown formatting (e.g. ```json ... ```)
         content = content.replace("```json", "").replace("```", "").strip()
         
-            # Parse the JSON string into a Python list
-        tags = json.loads(content)
+        # Parse the JSON string into a Python list
+        try:
+            tags = json.loads(content)
+        except json.JSONDecodeError as e:
+            print(f"DEBUG: Failed to parse AI response as JSON. Content: {content}")
+            return []
         
         if isinstance(tags, list):
             # Limit to max 5 tags just in case
             return tags[:5]
         else:
-             print(f"ZhipuAI returned an invalid format for tags: {content}")
+             print(f"DEBUG: ZhipuAI returned non-list format: {content}")
              return []
              
     except Exception as e:
-        print(f"Exception inside extract_tags: {e}")
+        print(f"CRITICAL: extract_tags failed. Error type: {type(e).__name__}, Message: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return []
