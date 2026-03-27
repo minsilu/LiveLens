@@ -26,7 +26,9 @@ def google_auth(request: GoogleAuthRequest):
         
     try:
         # Verify the Google token
-        client_id = os.environ.get("GOOGLE_CLIENT_ID", "YOUR_GOOGLE_CLIENT_ID") 
+        client_id = os.environ.get("GOOGLE_CLIENT_ID")
+        if not client_id:
+            raise HTTPException(status_code=500, detail="GOOGLE_CLIENT_ID not configured in server environment")
         try:
             idinfo = id_token.verify_oauth2_token(request.token, requests.Request(), client_id, clock_skew_in_seconds=10)
         except ValueError as e:
