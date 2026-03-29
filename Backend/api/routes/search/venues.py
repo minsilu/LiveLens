@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import text
 from ...database import engine
@@ -114,8 +115,27 @@ def search_venues(
             """)
             result = conn.execute(query, params)
 
-            venues = [
-                {
+            import re
+            S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "livelens-images")
+            AWS_REGION = os.getenv("AWS_REGION", "us-east-2")
+            venues = []
+            for row in result:
+                slug = re.sub(r'[^a-z0-9]+', '_', row[1].lower()).strip('_')
+                base_url = f"https://{S3_BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/venues/{slug}"
+                
+                # Default to just the facade
+                image_urls = [f"{base_url}/facade.png"]
+                
+                # If it's scotiabank_arena, provide multiple demo images (assuming these exist)
+                # The frontend will use these for a slideshow
+                if slug == "scotiabank_arena":
+                    image_urls = [
+                        f"{base_url}/facade.png",
+                        f"{base_url}/interior.jpg",
+                        f"{base_url}/stage.jpg"
+                    ]
+                    
+                venues.append({
                     "id": row[0],
                     "name": row[1],
                     "city": row[2],
@@ -125,9 +145,9 @@ def search_venues(
                     "review_count": row[6],
                     "seat_map_2d_url": row[7],
                     "seat_map_meta": row[8],
-                }
-                for row in result
-            ]
+                    "image_url": f"{base_url}/facade.png",
+                    "image_urls": image_urls
+                })
 
             return {
                 "total": total,
