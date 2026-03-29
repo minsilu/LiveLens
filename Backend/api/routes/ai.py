@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Any, Dict, Union, Optional
 from sqlalchemy import text
-from api.database import engine
+from ..database import engine
 
 try:
     from zhipuai import ZhipuAI
