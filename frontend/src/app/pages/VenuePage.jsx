@@ -3,8 +3,9 @@ import { useParams, useLocation, Link } from "react-router";
 import { venues as staticVenues } from "../data/venues.js";
 import { ReviewCard } from "../components/ReviewCard.jsx";
 import { ReviewFormModal } from "../components/ReviewFormModal.jsx";
-import { Star, MapPin, ArrowLeft, ChevronDown, PenLine } from "lucide-react";
+import { Star, MapPin, ArrowLeft, ChevronDown, PenLine, Box } from "lucide-react";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
+import { Venue3DModal } from "../components/Venue3DModal.jsx";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
@@ -30,6 +31,7 @@ export function VenuePage() {
   const [sections, setSections] = useState([]);
   const [filterSection, setFilterSection] = useState("");
   const [sectionFilterOpen, setSectionFilterOpen] = useState(false);
+  const [show3DModal, setShow3DModal] = useState(false);
   const reviewSortRef = useRef(null);
   const sectionFilterRef = useRef(null);
 
@@ -133,26 +135,42 @@ export function VenuePage() {
               className="w-full h-full object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-            <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
-              <div className="mb-2">
-                <span className="bg-blue-500/30 backdrop-blur-sm px-3 py-1 rounded-full text-sm border border-blue-400/30">
-                  {category}
-                </span>
-              </div>
-              <h1 className="text-4xl font-bold mb-3">{venue.name}</h1>
-              {venue.rating != null && (
-                <div className="flex items-center gap-2 mb-3">
-                  <Star className="w-6 h-6 fill-yellow-400 text-yellow-400" />
-                  <span className="text-2xl font-semibold">{venue.rating}</span>
-                  {(venue.review_count ?? venue.reviewCount) != null && (
-                    <span className="text-white/80">({(venue.review_count ?? venue.reviewCount).toLocaleString()} reviews)</span>
-                  )}
+            <div className="absolute bottom-0 left-0 right-0 p-8 text-white flex justify-between items-end">
+              <div>
+                <div className="mb-2">
+                  <span className="bg-blue-500/30 backdrop-blur-sm px-3 py-1 rounded-full text-sm border border-blue-400/30">
+                    {category}
+                  </span>
                 </div>
-              )}
-              <div className="flex items-center gap-2 text-white/90">
-                <MapPin className="w-5 h-5" />
-                <span>{location_str}</span>
+                <h1 className="text-4xl font-bold mb-3">{venue.name}</h1>
+                {venue.rating != null && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <Star className="w-6 h-6 fill-yellow-400 text-yellow-400" />
+                    <span className="text-2xl font-semibold">{venue.rating}</span>
+                    {(venue.review_count ?? venue.reviewCount) != null && (
+                      <span className="text-white/80">({(venue.review_count ?? venue.reviewCount).toLocaleString()} reviews)</span>
+                    )}
+                  </div>
+                )}
+                <div className="flex items-center gap-2 text-white/90">
+                  <MapPin className="w-5 h-5" />
+                  <span>{location_str}</span>
+                </div>
               </div>
+              
+              {/* 3D View Button at bottom right */}
+              <button 
+                onClick={() => setShow3DModal(true)}
+                className="group flex items-center gap-3 px-5 py-3 bg-gray-900/60 hover:bg-black/70 backdrop-blur-md rounded-2xl border border-white/10 hover:border-blue-500/50 text-white font-medium transition-all duration-300 shadow-[0_8px_30px_rgba(0,0,0,0.5)] hover:shadow-[0_10px_40px_rgba(59,130,246,0.25)] hover:-translate-y-1"
+              >
+                <div className="bg-blue-500/20 p-2.5 rounded-xl group-hover:bg-blue-500/40 transition-colors border border-blue-500/20">
+                  <Box className="w-5 h-5 text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
+                </div>
+                <div className="flex flex-col items-start pr-1">
+                  <span className="text-sm font-semibold tracking-wide text-gray-100 group-hover:text-white transition-colors">3D View</span>
+                  <span className="text-[10px] text-blue-300/70 font-mono tracking-wider">INTERACTIVE</span>
+                </div>
+              </button>
             </div>
           </div>
         </div>
@@ -259,6 +277,14 @@ export function VenuePage() {
             ))}
           </div>
         </div>
+
+        {/* 3D Modal */}
+        {show3DModal && (
+          <Venue3DModal 
+            venueName={venue.name} 
+            onClose={() => setShow3DModal(false)} 
+          />
+        )}
       </div>
     </div>
   );

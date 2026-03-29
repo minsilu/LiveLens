@@ -173,7 +173,7 @@ On Windows (PowerShell)
 First, set your environment variable, then run the connection command:
 
 ```PowerShell
-$env:RDSHOST="database-1.c36wyoowwijy.us-east-2.rds.amazonaws.com
+$env:RDSHOST="database-1.c36wyoowwijy.us-east-2.rds.amazonaws.com"
 # Connect using psql
 psql -h $env:RDSHOST -U postgres -d postgres
 # enter your pwd
