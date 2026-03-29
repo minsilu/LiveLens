@@ -3,13 +3,11 @@ import json
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Any, Dict, Union, Optional
-import google.generativeai as genai
 
-# Try to get the API key from environment
-gemini_api_key = os.getenv("GEMINI_API_KEY")
-
-if gemini_api_key:
-    genai.configure(api_key=gemini_api_key)
+try:
+    from zhipuai import ZhipuAI
+except ImportError:
+    ZhipuAI = None
 
 router = APIRouter()
 
@@ -22,14 +20,18 @@ class AnalyzeRequest(BaseModel):
 @router.post("/analyze")
 async def analyze_data(request: AnalyzeRequest):
     """
-    Endpoint to analyze text or JSON data using Gemini API.
+    Endpoint to analyze text or JSON data using Zhipu GLM-4 API.
     """
-    if not gemini_api_key:
-        raise HTTPException(status_code=500, detail="GEMINI_API_KEY is not configured in the environment.")
+    zhipu_api_key = os.getenv("ZHIPUAI_API_KEY")
+    if not zhipu_api_key:
+        raise HTTPException(status_code=500, detail="ZHIPUAI_API_KEY is not configured in the environment.")
     
+    if ZhipuAI is None:
+        raise HTTPException(status_code=500, detail="ZhipuAI library is not installed.")
+        
     try:
-        # Determine the model to use. flash is usually the best for general fast analysis.
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        # Initialize ZhipuAI client
+        client = ZhipuAI(api_key=zhipu_api_key)
         
         # Format the input data
         formatted_input = ""
@@ -40,24 +42,32 @@ async def analyze_data(request: AnalyzeRequest):
             formatted_input = json.dumps(request.input_data, indent=2)
             
         # Construct the final prompt
-        system_instruction = (
+        instruction_text = (
              "You are an AI assistant analyzing data for the LiveLens application. "
              "Analyze the user's needs or the following input data and provide a detailed, "
              "helpful response based on the provided context."
         )
         
         if request.instructions:
-            system_instruction += f"\nExtra instructions from user: {request.instructions}"
+            instruction_text += f"\nExtra instructions from user: {request.instructions}"
             
-        full_prompt = f"{system_instruction}\n\nInput Data to Analyze:\n{formatted_input}"
+        full_prompt = f"Input Data to Analyze:\n{formatted_input}"
         
-        # Generate the response
-        response = model.generate_content(full_prompt)
+        # Generate the response using Zhipu GLM-4 model
+        response = client.chat.completions.create(
+            model="glm-4",
+            messages=[
+                {"role": "system", "content": instruction_text},
+                {"role": "user", "content": full_prompt}
+            ],
+            temperature=0.7,
+            timeout=60,
+        )
         
         # Return the generated text
         return {
             "status": "success",
-            "analysis": response.text
+            "analysis": response.choices[0].message.content
         }
     except Exception as e:
-         raise HTTPException(status_code=500, detail=f"Failed to analyze data with Gemini: {str(e)}")
+         raise HTTPException(status_code=500, detail=f"Failed to analyze data with ZhipuAI: {str(e)}")
