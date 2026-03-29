@@ -184,7 +184,7 @@ On macOS / Linux
 ```Bash
 export RDSHOST="database-1.c36wyoowwijy.us-east-2.rds.amazonaws.com"
 psql -h $RDSHOST -U postgres -d postgres
-# enter your pwd
+
 ```
 
 ### 5. Troubleshooting
