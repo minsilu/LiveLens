@@ -219,6 +219,7 @@ export function ProfilePage() {
                   </Link>
                   <ReviewCard
                     review={{
+                      id: review.id,
                       author: user.is_incognito
                         ? "Anonymous"
                         : user.email,

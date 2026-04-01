@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Star, User } from "lucide-react";
+import { Link } from "react-router";
+import { Star, User, ChevronRight } from "lucide-react";
 import { ImageLightbox } from "./ImageLightbox";
 
 export function ReviewCard({ review }) {
@@ -18,8 +19,8 @@ export function ReviewCard({ review }) {
     });
   };
 
-  return (
-    <div className="border border-gray-700 bg-gray-800/30 rounded-lg p-6 hover:border-gray-600 hover:bg-gray-800/50 transition-all">
+  const cardContent = (
+    <>
       <div className="flex items-start gap-4">
         <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
           <User className="w-6 h-6 text-white" />
@@ -32,9 +33,14 @@ export function ReviewCard({ review }) {
                 <p className="text-xs text-gray-500 mt-0.5">{review.seatInfo}</p>
               )}
             </div>
-            <span className="text-sm text-gray-400">
-              {formatDate(review.date)}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-400">
+                {formatDate(review.date)}
+              </span>
+              {review.id && (
+                <ChevronRight className="w-4 h-4 text-gray-600 group-hover:text-blue-400 transition-colors" />
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-1 mb-2">
             {[...Array(5)].map((_, index) => (
@@ -52,8 +58,8 @@ export function ReviewCard({ review }) {
             <div className="flex items-center gap-3 mb-3">
               {[
                 { label: "Visual", value: review.ratingVisual },
-                { label: "Sound", value: review.ratingSound },
-                { label: "Value", value: review.ratingValue },
+                { label: "Sound",  value: review.ratingSound },
+                { label: "Value",  value: review.ratingValue },
               ].map(({ label, value }) => value != null && (
                 <span key={label} className="text-xs text-gray-500">
                   {label} <span className="text-gray-300">{value}/5</span>
@@ -61,14 +67,14 @@ export function ReviewCard({ review }) {
               ))}
             </div>
           )}
-          <p className="text-gray-300 leading-relaxed">{review.comment}</p>
+          <p className="text-gray-300 leading-relaxed line-clamp-4">{review.comment}</p>
           {images.length > 0 && (
             <div className="flex gap-2 flex-wrap mt-3">
               {images.map((url, i) => (
                 <img
                   key={i}
                   src={url}
-                  onClick={() => setLightboxIndex(i)}
+                  onClick={(e) => { e.preventDefault(); setLightboxIndex(i); }}
                   className="w-20 h-16 object-cover rounded-lg cursor-pointer border border-gray-700 hover:border-blue-500 transition-colors"
                 />
               ))}
@@ -83,6 +89,19 @@ export function ReviewCard({ review }) {
           )}
         </div>
       </div>
-    </div>
+    </>
   );
+
+  const sharedClass =
+    "group block border border-gray-700 bg-gray-800/30 rounded-lg p-6 hover:border-gray-600 hover:bg-gray-800/50 transition-all";
+
+  if (review.id) {
+    return (
+      <Link to={`/reviews/${review.id}`} className={sharedClass}>
+        {cardContent}
+      </Link>
+    );
+  }
+
+  return <div className={sharedClass}>{cardContent}</div>;
 }

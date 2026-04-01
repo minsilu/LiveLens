@@ -263,6 +263,7 @@ export function VenuePage() {
               <ReviewCard
                 key={review.id}
                 review={{
+                  id: review.id,
                   author: "Verified Attendee",
                   seatInfo: review.section && review.row ? `Section ${review.section}, Row ${review.row}${review.seat_number ? `, Seat ${review.seat_number}` : ""}` : null,
                   date: review.created_at ?? new Date().toISOString(),
