@@ -263,6 +263,77 @@ def generate_s3_presigned_url(review_id: str, pic_num: int, filename: str, conte
         raise HTTPException(status_code=500, detail=f"Could not generate S3 presigned URL: {str(e)}")
 
 
+@router.get("/{review_id}")
+def get_review(review_id: str):
+    """
+    Fetch full details for a single review by its ID.
+    Joins with Seats, Venues, and Events to return enriched context.
+    Used by the Review Detail page on the frontend.
+    """
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    try:
+        with engine.connect() as conn:
+            row = conn.execute(
+                text("""
+                    SELECT
+                        r.id, r.user_id, r.event_id, r.venue_id, r.seat_id,
+                        r.rating_visual, r.rating_sound, r.rating_value, r.overall_rating,
+                        r.price_paid, r.text, r.images, r.tags, r.created_at,
+                        s.section, s.row, s.seat_number,
+                        v.name AS venue_name,
+                        e.name AS event_name, e.event_date
+                    FROM Reviews r
+                    LEFT JOIN Seats   s ON r.seat_id   = s.id
+                    LEFT JOIN Venues  v ON r.venue_id  = v.id
+                    LEFT JOIN Events  e ON r.event_id  = e.id
+                    WHERE r.id = :review_id
+                """),
+                {"review_id": review_id},
+            ).fetchone()
+
+            if not row:
+                raise HTTPException(status_code=404, detail="Review not found")
+
+            # Safely parse JSON-string fields (SQLite stores as text; Postgres may return objects)
+            def _parse_json(val):
+                if val is None:
+                    return []
+                if isinstance(val, (list, dict)):
+                    return val
+                try:
+                    return json.loads(val)
+                except Exception:
+                    return []
+
+            return {
+                "id":             row[0],
+                "user_id":        row[1],
+                "event_id":       row[2],
+                "venue_id":       row[3],
+                "seat_id":        row[4],
+                "rating_visual":  row[5],
+                "rating_sound":   row[6],
+                "rating_value":   row[7],
+                "overall_rating": row[8],
+                "price_paid":     row[9],
+                "text":           row[10],
+                "images":         _parse_json(row[11]),
+                "tags":           _parse_json(row[12]),
+                "created_at":     row[13],
+                "section":        row[14],
+                "row":            row[15],
+                "seat_number":    row[16],
+                "venue_name":     row[17],
+                "event_name":     row[18],
+                "event_date":     row[19],
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch review: {str(e)}")
+
+
 @router.patch("/img-database")
 def update_review_images(review_id: str, payload: ReviewImagesUpdate, user_id: str = Depends(get_current_user)):
     """
