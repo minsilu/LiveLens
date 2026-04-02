@@ -151,6 +151,16 @@ def get_profile(user_id: str = Depends(get_current_user)):
             venue_count = {}
             total_rating = 0
             
+            def _parse_json(val):
+                if val is None:
+                    return []
+                if isinstance(val, (list, dict)):
+                    return val
+                try:
+                    return json.loads(val)
+                except Exception:
+                    return []
+            
             for row in reviews_rows:
                 rid, venue_id, venue_name, event_id, rv, rs, rval, ro, pp, txt, imgs, tags, cat, sec, rw, sn = row
                 reviews.append({
@@ -164,8 +174,8 @@ def get_profile(user_id: str = Depends(get_current_user)):
                     "overall_rating": ro,
                     "price_paid": pp,
                     "text": txt,
-                    "images": json.loads(imgs) if imgs else [],
-                    "tags": json.loads(tags) if tags else [],
+                    "images": _parse_json(imgs),
+                    "tags": _parse_json(tags),
                     "created_at": str(cat) if cat else None,
                     "section": sec,
                     "row": rw,
