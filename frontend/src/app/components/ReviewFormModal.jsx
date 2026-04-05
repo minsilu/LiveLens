@@ -89,7 +89,7 @@ function EventCombobox({ events, value, onChange }) {
   );
 }
 
-export function ReviewFormModal({ venueId, onClose }) {
+export function ReviewFormModal({ venueId, onClose, onSuccess }) {
   const [events, setEvents] = useState([]);
   const [seats, setSeats] = useState([]);
   const [eventId, setEventId] = useState("");
@@ -142,7 +142,7 @@ export function ReviewFormModal({ venueId, onClose }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem("access_token");
     if (!token) return alert("Please log in to post a review.");
 
     const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
@@ -198,7 +198,7 @@ export function ReviewFormModal({ venueId, onClose }) {
       }
     }
 
-    onClose();
+    (onSuccess ?? onClose)();
   }
 
   return (
