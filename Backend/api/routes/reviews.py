@@ -66,6 +66,9 @@ class ReviewCreate(BaseModel):
 class ReviewImagesUpdate(BaseModel):
     images: List[str]
 
+class SubReviewCreate(BaseModel):
+    text: str
+
 @router.post("/")
 def create_review(review: ReviewCreate, user_id: str = Depends(get_current_user)):
     """
@@ -306,6 +309,30 @@ def get_review(review_id: str):
                 except Exception:
                     return []
 
+            # Fetch sub-reviews for this review
+            sub_rows = conn.execute(
+                text("""
+                    SELECT sr.id, sr.user_id, sr.text, sr.created_at,
+                           u.email
+                    FROM SubReviews sr
+                    LEFT JOIN Users u ON sr.user_id = u.id
+                    WHERE sr.review_id = :review_id
+                    ORDER BY sr.created_at ASC
+                """),
+                {"review_id": review_id},
+            ).fetchall()
+
+            sub_reviews = [
+                {
+                    "id": str(sr[0]),
+                    "user_id": str(sr[1]) if sr[1] else None,
+                    "text": sr[2],
+                    "created_at": sr[3],
+                    "user_email": sr[4],
+                }
+                for sr in sub_rows
+            ]
+
             return {
                 "id":             row[0],
                 "user_id":        row[1],
@@ -327,6 +354,7 @@ def get_review(review_id: str):
                 "venue_name":     row[17],
                 "event_name":     row[18],
                 "event_date":     row[19],
+                "sub_reviews":    sub_reviews,
             }
     except HTTPException:
         raise
@@ -366,3 +394,84 @@ def update_review_images(review_id: str, payload: ReviewImagesUpdate, user_id: s
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update images: {str(e)}")
+
+
+@router.post("/{review_id}/sub-reviews")
+def create_sub_review(review_id: str, payload: SubReviewCreate, user_id: str = Depends(get_current_user)):
+    """
+    Post a sub-review (comment) on an existing review. Requires authentication.
+    """
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    if not payload.text or not payload.text.strip():
+        raise HTTPException(status_code=400, detail="Sub-review text cannot be empty")
+
+    sub_review_id = str(uuid.uuid4())
+    try:
+        with engine.begin() as conn:
+            # Verify the parent review exists
+            review_exists = conn.execute(
+                text("SELECT 1 FROM Reviews WHERE id = :review_id"),
+                {"review_id": review_id},
+            ).scalar()
+            if not review_exists:
+                raise HTTPException(status_code=404, detail="Parent review not found")
+
+            conn.execute(
+                text("""
+                    INSERT INTO SubReviews (id, review_id, user_id, text, created_at)
+                    VALUES (:id, :review_id, :user_id, :text, :created_at)
+                """),
+                {
+                    "id": sub_review_id,
+                    "review_id": review_id,
+                    "user_id": user_id,
+                    "text": payload.text.strip(),
+                    "created_at": datetime.utcnow(),
+                },
+            )
+            return {
+                "message": "Sub-review posted successfully",
+                "sub_review_id": sub_review_id,
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to post sub-review: {str(e)}")
+
+
+@router.get("/{review_id}/sub-reviews")
+def get_sub_reviews(review_id: str):
+    """
+    Get all sub-reviews (comments) for a specific review. Public endpoint.
+    """
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(
+                text("""
+                    SELECT sr.id, sr.user_id, sr.text, sr.created_at,
+                           u.email
+                    FROM SubReviews sr
+                    LEFT JOIN Users u ON sr.user_id = u.id
+                    WHERE sr.review_id = :review_id
+                    ORDER BY sr.created_at ASC
+                """),
+                {"review_id": review_id},
+            ).fetchall()
+
+            return {
+                "sub_reviews": [
+                    {
+                        "id": str(r[0]),
+                        "user_id": str(r[1]) if r[1] else None,
+                        "text": r[2],
+                        "created_at": r[3],
+                        "user_email": r[4],
+                    }
+                    for r in rows
+                ]
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch sub-reviews: {str(e)}")

@@ -136,6 +136,15 @@ if DATABASE_URL:
                   PRIMARY KEY (seat_id, similar_seat_id)
                 );
             """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS SubReviews (
+                  id          TEXT PRIMARY KEY,
+                  review_id   TEXT REFERENCES Reviews(id) ON DELETE CASCADE,
+                  user_id     TEXT REFERENCES Users(id),
+                  text        TEXT NOT NULL,
+                  created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """))
             
     else:
         engine = create_engine(DATABASE_URL)
