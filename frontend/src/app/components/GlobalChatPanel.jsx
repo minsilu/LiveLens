@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { X, Send, Sparkles } from "lucide-react";
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+
 export function GlobalChatPanel({ isOpen, onClose }) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
@@ -29,7 +31,7 @@ export function GlobalChatPanel({ isOpen, onClose }) {
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/ai/analyze", {
+      const response = await fetch(`${API_BASE}/ai/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

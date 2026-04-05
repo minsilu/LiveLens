@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { Send, Sparkles, ChevronDown } from "lucide-react";
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+
 export function VenueChatBar({ venueName, venueId }) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
@@ -25,7 +27,7 @@ export function VenueChatBar({ venueName, venueId }) {
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/ai/analyze", {
+      const response = await fetch(`${API_BASE}/ai/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
