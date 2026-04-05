@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { Outlet, Link } from "react-router";
-import { User } from "lucide-react";
+import { User, Sparkles } from "lucide-react";
+import { GlobalChatPanel } from "./GlobalChatPanel.jsx";
 
 export function RootLayout() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   useEffect(() => {
     setIsLoggedIn(!!localStorage.getItem("access_token"));
@@ -25,6 +27,13 @@ export function RootLayout() {
               <span className="text-xl font-bold text-white leading-none translate-y-0.5">VenueHub</span>
             </Link>
             <div className="flex items-center gap-3">
+              <button
+                onClick={() => setIsChatOpen(true)}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white bg-gray-800/60 hover:bg-gray-700/60 border border-gray-700/50 rounded-lg transition-colors"
+              >
+                <Sparkles className="w-4 h-4 text-blue-400" />
+                <span className="hidden sm:block">Ask AI</span>
+              </button>
               {isLoggedIn ? (
                 <Link
                   to="/profile"
@@ -55,6 +64,7 @@ export function RootLayout() {
       <main>
         <Outlet />
       </main>
+      <GlobalChatPanel isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
     </div>
   );
 }
