@@ -137,6 +137,24 @@ if DATABASE_URL:
                 );
             """))
             conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS SeatmapCache (
+                  id              TEXT PRIMARY KEY,
+                  tm_venue_id     TEXT,
+                  png_url         TEXT,
+                  section_coords  TEXT,
+                  created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS SeatmapPinCache (
+                  id              TEXT PRIMARY KEY,
+                  venue_key       TEXT,
+                  section         TEXT,
+                  s3_url          TEXT NOT NULL,
+                  created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """))
+            conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS SubReviews (
                   id          TEXT PRIMARY KEY,
                   review_id   TEXT REFERENCES Reviews(id) ON DELETE CASCADE,
