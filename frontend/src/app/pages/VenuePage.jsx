@@ -175,7 +175,7 @@ export function VenuePage() {
           </div>
         </div>
 
-<div className="bg-gray-800/40 backdrop-blur-sm rounded-lg shadow-2xl p-8 border border-gray-700/50">
+        <div className="bg-gray-800/40 backdrop-blur-sm rounded-lg shadow-2xl p-8 border border-gray-700/50">
           <div className="flex items-start justify-between mb-6">
             <div>
               <h2 className="text-2xl font-semibold text-white">Customer Reviews</h2>

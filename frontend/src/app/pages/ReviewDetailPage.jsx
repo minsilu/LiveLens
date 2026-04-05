@@ -12,6 +12,7 @@ import {
   BadgeDollarSign,
   User,
   Tag,
+  Crosshair,
 } from "lucide-react";
 import { ImageLightbox } from "../components/ImageLightbox";
 
@@ -66,12 +67,50 @@ function MetaBadge({ icon: Icon, label, value, colorClass = "text-gray-300" }) {
   );
 }
 
+function SeatViewSkeleton() {
+  return (
+    <div className="bg-gray-800/40 backdrop-blur-sm rounded-2xl border border-gray-700/50 p-6 mb-6 overflow-hidden">
+      <div className="flex items-center gap-2 mb-4">
+        <div className="w-5 h-5 rounded bg-gray-700 animate-pulse" />
+        <div className="h-4 w-48 rounded bg-gray-700 animate-pulse" />
+      </div>
+      <div className="relative w-full aspect-square rounded-xl bg-gray-700/50 overflow-hidden">
+        {/* Shimmer overlay */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%)",
+            animation: "shimmer 2s infinite",
+          }}
+        />
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+          <div className="w-10 h-10 border-3 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-gray-400 font-medium">Generating seat view…</p>
+          <p className="text-xs text-gray-600">This may take a few seconds</p>
+        </div>
+      </div>
+      <style>{`
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 export function ReviewDetailPage() {
   const { reviewId } = useParams();
   const [review, setReview] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lightboxIndex, setLightboxIndex] = useState(null);
+
+  // --- Seat view image state ---
+  const [seatViewUrl, setSeatViewUrl] = useState(null);
+  const [seatViewLoading, setSeatViewLoading] = useState(false);
+  const [seatViewError, setSeatViewError] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -84,6 +123,27 @@ export function ReviewDetailPage() {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [reviewId]);
+
+  // Fetch seat view image once review is loaded
+  useEffect(() => {
+    if (!review) return;
+    const { venue_name, section, row, seat_number } = review;
+    if (!venue_name || !section || !row || !seat_number) return;
+
+    setSeatViewLoading(true);
+    setSeatViewError(false);
+    setSeatViewUrl(null);
+
+    const params = new URLSearchParams({ venue_name, section, row, seat_number });
+    fetch(`${API_BASE}/ai/seat-view-image?${params}`)
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed");
+        return r.json();
+      })
+      .then((data) => setSeatViewUrl(data.image_url))
+      .catch(() => setSeatViewError(true))
+      .finally(() => setSeatViewLoading(false));
+  }, [review]);
 
   const formatDate = (ds) => {
     if (!ds) return "—";
@@ -138,6 +198,10 @@ export function ReviewDetailPage() {
     review.row      && `Row ${review.row}`,
     review.seat_number && `Seat ${review.seat_number}`,
   ].filter(Boolean).join(", ") || null;
+
+  // Build the combined image list for the lightbox (review images + seat view)
+  const allLightboxImages = [...images];
+  if (seatViewUrl) allLightboxImages.push(seatViewUrl);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900">
@@ -217,6 +281,28 @@ export function ReviewDetailPage() {
           </div>
         </div>
 
+        {/* ── AI-Generated Seat View ─────────────────────────────────────── */}
+        {seatViewLoading && <SeatViewSkeleton />}
+        {seatViewUrl && !seatViewLoading && (
+          <div className="bg-gray-800/40 backdrop-blur-sm rounded-2xl border border-gray-700/50 p-6 mb-6 overflow-hidden">
+            <div className="flex items-center gap-2 mb-4">
+              <Crosshair className="w-5 h-5 text-blue-400" />
+              <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">
+                Seat View — {seatLabel}
+              </h2>
+              <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/25 font-medium">
+                AI Generated
+              </span>
+            </div>
+            <img
+              src={seatViewUrl}
+              alt={`2D seat map showing ${seatLabel} at ${review.venue_name}`}
+              onClick={() => setLightboxIndex(images.length)}
+              className="w-full rounded-xl cursor-pointer border border-gray-700 hover:border-blue-500 transition-colors duration-200"
+            />
+          </div>
+        )}
+
         {/* ── Rating breakdown ──────────────────────────────────────────── */}
         <div className="bg-gray-800/40 backdrop-blur-sm rounded-2xl border border-gray-700/50 p-6 mb-6">
           <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">
@@ -293,7 +379,7 @@ export function ReviewDetailPage() {
       {/* Lightbox */}
       {lightboxIndex !== null && (
         <ImageLightbox
-          images={images}
+          images={allLightboxImages}
           startIndex={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
         />
@@ -301,3 +387,4 @@ export function ReviewDetailPage() {
     </div>
   );
 }
+

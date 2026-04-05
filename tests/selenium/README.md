@@ -29,6 +29,9 @@ python3 tests/selenium/test_open_write_review_form.py
 python3 tests/selenium/test_3d_view_open.py
 python3 tests/selenium/test_chat_widget.py
 python3 tests/selenium/test_auth_buttons.py
+python3 tests/selenium/test_post_review.py
+python3 tests/selenium/test_add_photos_button.py
+python3 tests/selenium/test_back_to_venues.py
 ```
 
 ## Current test coverage
@@ -48,6 +51,9 @@ These Selenium tests currently verify:
  - the 3D venue view can be opened from the venue details page
  - the chat widget can be opened on the venue details page
  - the sign in and sign up buttons are displayed on the venue details page
+ - posting a review requires the user to be logged in
+ - the add photos button can be used in the write a review form
+ - the back to venues button can be used to back to the homepage on the venue details page
 
 
 ## Notes

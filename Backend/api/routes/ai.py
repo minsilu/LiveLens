@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from typing import Any, Dict, Union, Optional
 from sqlalchemy import text
 from ..database import engine
+from ..utils.zhipu_client import generate_seat_view_image
 
 try:
     from zhipuai import ZhipuAI
@@ -575,3 +576,32 @@ async def analyze_data(request: AnalyzeRequest):
         }
     except Exception as e:
          raise HTTPException(status_code=500, detail=f"Failed to analyze data with ZhipuAI: {str(e)}")
+
+
+@router.get("/seat-view-image")
+async def get_seat_view_image(
+    venue_name: str,
+    section: str,
+    row: str,
+    seat_number: str,
+):
+    """
+    Generate a 2D seat-view image for a specific seat at a venue using AI.
+
+    Query Parameters:
+    - venue_name: Name of the venue (e.g. "Scotiabank Arena")
+    - section: Section identifier (e.g. "1")
+    - row: Row identifier (e.g. "F")
+    - seat_number: Seat number (e.g. "19")
+
+    Returns:
+    { "image_url": "https://..." }
+    """
+    image_url = generate_seat_view_image(venue_name, section, row, seat_number)
+    if not image_url:
+        raise HTTPException(
+            status_code=502,
+            detail="Failed to generate seat view image. Please try again later.",
+        )
+    return {"image_url": image_url}
+
