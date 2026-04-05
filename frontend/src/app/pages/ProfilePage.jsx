@@ -25,6 +25,7 @@ export function ProfilePage() {
   const [error, setError] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [seatViewUrls, setSeatViewUrls] = useState({});
 
   useEffect(() => {
     const token = localStorage.getItem("access_token");
@@ -51,6 +52,35 @@ export function ProfilePage() {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [navigate]);
+
+  // Fetch seatmap pin images for each review that has seat info
+  useEffect(() => {
+    if (!profile?.reviews) return;
+    const reviewsWithSeat = profile.reviews.filter(
+      (r) => r.venue_name && r.section && r.row && r.seat_number
+    );
+    if (reviewsWithSeat.length === 0) return;
+
+    reviewsWithSeat.forEach((review) => {
+      // Skip if already fetched
+      if (seatViewUrls[review.id]) return;
+
+      const params = new URLSearchParams({
+        venue_name: review.venue_name,
+        section: review.section,
+        row: review.row,
+        seat_number: review.seat_number,
+      });
+      fetch(`${API_BASE}/ai/seat-view-image?${params}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data?.image_url) {
+            setSeatViewUrls((prev) => ({ ...prev, [review.id]: data.image_url }));
+          }
+        })
+        .catch(() => {});
+    });
+  }, [profile]);
 
   function handleLogout() {
     localStorage.removeItem("access_token");
@@ -272,7 +302,9 @@ export function ProfilePage() {
                       ratingSound: review.rating_sound,
                       ratingValue: review.rating_value,
                       comment: review.text ?? "",
-                      images: review.images ?? null,
+                      images: seatViewUrls[review.id]
+                        ? [seatViewUrls[review.id]]
+                        : (review.images ?? null),
                     }}
                   />
                   {/* Delete button — appears on hover */}
