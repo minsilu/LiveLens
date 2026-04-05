@@ -8,7 +8,7 @@ from typing import List, Optional
 from botocore.exceptions import NoCredentialsError, ClientError
 from botocore.config import Config
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -20,10 +20,16 @@ from ..auth_utils import SECRET_KEY, ALGORITHM
 # S3 Configuration
 S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "livelens-images")
 AWS_REGION = os.getenv("AWS_REGION", "us-east-2")
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+AWS_SESSION_TOKEN = os.getenv("AWS_SESSION_TOKEN")  # Required for temporary STS credentials
 
 s3_client = boto3.client(
-    's3', 
+    's3',
     region_name=AWS_REGION,
+    aws_access_key_id=AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+    aws_session_token=AWS_SESSION_TOKEN,  # None for long-term keys, required for STS/SSO
     config=Config(
         s3={'addressing_style': 'virtual'},
         signature_version='s3v4'
@@ -223,6 +229,38 @@ def create_review(review: ReviewCreate, user_id: str = Depends(get_current_user)
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to submit review: {str(e)}")
+
+
+@router.post("/upload-image")
+def upload_review_image(
+    review_id: str,
+    pic_num: int,
+    file: UploadFile = File(...),
+    user_id: str = Depends(get_current_user)
+):
+    """
+    Backend-proxied image upload to S3.
+    Accepts a multipart image file and uploads it to S3 server-side,
+    avoiding the need for S3 CORS configuration on the bucket.
+    Returns the public URL of the uploaded image.
+    """
+    file_extension = file.filename.split(".")[-1].lower()
+    unique_filename = f"{review_id}_{pic_num}.{file_extension}"
+    s3_key = f"reviews/{unique_filename}"
+
+    try:
+        s3_client.upload_fileobj(
+            file.file,
+            S3_BUCKET_NAME,
+            s3_key,
+            ExtraArgs={"ContentType": file.content_type},
+        )
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"S3 upload failed: {str(e)}")
+
+    image_url = f"https://{S3_BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/{s3_key}"
+    return {"url": image_url}
 
 
 @router.get("/img-presigned-url")

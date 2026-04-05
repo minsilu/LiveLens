@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Star, Camera, ChevronDown } from "lucide-react";
+import { X, Star, Camera, ChevronDown, Loader2, CheckCircle } from "lucide-react";
 import { ImageLightbox } from "./ImageLightbox";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
@@ -103,6 +103,8 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [lightboxIndex, setLightboxIndex] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const fileInputRef = useRef(null);
 
   const numSort = (a, b) => (isNaN(a) || isNaN(b) ? a.localeCompare(b) : Number(a) - Number(b));
@@ -145,6 +147,7 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
     const token = localStorage.getItem("access_token");
     if (!token) return alert("Please log in to post a review.");
 
+    setSubmitting(true);
     const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
 
     const res = await fetch(`${API_BASE}/reviews/`, {
@@ -163,30 +166,27 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
         text: reviewText,
       }),
     });
-    if (!res.ok) return alert("Failed to submit review.");
+    if (!res.ok) {
+      setSubmitting(false);
+      return alert("Failed to submit review.");
+    }
     const { review_id } = await res.json();
 
     if (selectedFiles.length > 0) {
       const imageUrls = [];
       for (let i = 0; i < selectedFiles.length; i++) {
         const { file } = selectedFiles[i];
-        const params = new URLSearchParams({
-          review_id,
-          pic_num: i + 1,
-          filename: file.name,
-          content_type: file.type,
-        });
-        const urlRes = await fetch(`${API_BASE}/reviews/img-presigned-url?${params}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!urlRes.ok) continue;
-        const { upload_instructions, future_url } = await urlRes.json();
-
         const formData = new FormData();
-        Object.entries(upload_instructions.fields).forEach(([k, v]) => formData.append(k, v));
         formData.append("file", file);
-        await fetch(upload_instructions.url, { method: "POST", body: formData });
-        imageUrls.push(future_url);
+        const params = new URLSearchParams({ review_id, pic_num: i + 1 });
+        const uploadRes = await fetch(`${API_BASE}/reviews/upload-image?${params}`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        });
+        if (!uploadRes.ok) continue;
+        const { url } = await uploadRes.json();
+        imageUrls.push(url);
       }
 
       if (imageUrls.length > 0) {
@@ -198,7 +198,25 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
       }
     }
 
-    (onSuccess ?? onClose)();
+    setSubmitting(false);
+    setSubmitted(true);
+    setTimeout(() => (onSuccess ?? onClose)(), 2000);
+  }
+
+  if (submitted) {
+    return (
+      <div className="mt-6 bg-gray-800/30 border border-gray-700 rounded-xl overflow-hidden">
+        <div className="flex flex-col items-center justify-center gap-4 py-16 px-8 text-center">
+          <div className="w-16 h-16 rounded-full bg-green-500/15 border border-green-500/30 flex items-center justify-center">
+            <CheckCircle className="w-8 h-8 text-green-400" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-white">Review Posted!</h3>
+            <p className="text-gray-400 text-sm mt-1">Thanks for sharing your experience with the community.</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -364,9 +382,12 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
               </button>
               <button
                 type="submit"
-                className="flex-1 md:flex-none px-10 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-lg shadow-blue-500/20 transition-all active:scale-95"
+                disabled={submitting}
+                className="flex-1 md:flex-none px-10 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-70 text-white font-bold rounded-lg shadow-lg shadow-blue-500/20 transition-all active:scale-95 flex items-center justify-center gap-2"
               >
-                Post Review
+                {submitting ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" />Posting...</>
+                ) : "Post Review"}
               </button>
             </div>
           </div>
