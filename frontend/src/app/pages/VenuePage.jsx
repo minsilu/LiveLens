@@ -6,7 +6,6 @@ import { ReviewFormModal } from "../components/ReviewFormModal.jsx";
 import { Star, MapPin, ArrowLeft, ChevronDown, PenLine, Box } from "lucide-react";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import { Venue3DModal } from "../components/Venue3DModal.jsx";
-import { VenueChatBar } from "../components/VenueChatBar.jsx";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
@@ -175,8 +174,6 @@ export function VenuePage() {
             </div>
           </div>
         </div>
-
-        <VenueChatBar venueName={venue.name} venueId={venue.id} />
 
         <div className="bg-gray-800/40 backdrop-blur-sm rounded-lg shadow-2xl p-8 border border-gray-700/50">
           <div className="flex items-start justify-between mb-6">
