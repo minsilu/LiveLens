@@ -289,22 +289,24 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
   // Not logged in — show login prompt instead of form
   if (!isLoggedIn) {
     return (
-      <div className="mt-6 bg-gray-800/30 border border-gray-700 rounded-xl overflow-hidden">
-        <div className="flex flex-col items-center justify-center gap-4 py-12 px-8 text-center">
-          <div className="w-14 h-14 rounded-full bg-blue-500/15 border border-blue-500/30 flex items-center justify-center">
-            <LogIn className="w-7 h-7 text-blue-400" />
-          </div>
-          <div>
-            <h3 className="text-lg font-bold text-white">Sign in to write a review</h3>
-            <p className="text-gray-400 text-sm mt-1">Share your experience with the community</p>
-          </div>
-          <div className="flex gap-3">
-            <Link to="/login" className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
-              Sign in
-            </Link>
-            <button onClick={onClose} className="px-6 py-2.5 bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium rounded-lg transition-colors">
-              Cancel
-            </button>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto">
+        <div className="w-full max-w-md bg-gray-900 border border-gray-700 rounded-xl shadow-2xl">
+          <div className="flex flex-col items-center justify-center gap-4 py-12 px-8 text-center">
+            <div className="w-14 h-14 rounded-full bg-blue-500/15 border border-blue-500/30 flex items-center justify-center">
+              <LogIn className="w-7 h-7 text-blue-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-white">Sign in to write a review</h3>
+              <p className="text-gray-400 text-sm mt-1">Share your experience with the community</p>
+            </div>
+            <div className="flex gap-3">
+              <Link to="/login" className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
+                Sign in
+              </Link>
+              <button onClick={onClose} className="px-6 py-2.5 bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium rounded-lg transition-colors">
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -313,14 +315,16 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
 
   if (submitted) {
     return (
-      <div className="mt-6 bg-gray-800/30 border border-gray-700 rounded-xl overflow-hidden">
-        <div className="flex flex-col items-center justify-center gap-4 py-16 px-8 text-center">
-          <div className="w-16 h-16 rounded-full bg-green-500/15 border border-green-500/30 flex items-center justify-center">
-            <CheckCircle className="w-8 h-8 text-green-400" />
-          </div>
-          <div>
-            <h3 className="text-xl font-bold text-white">Review Posted!</h3>
-            <p className="text-gray-400 text-sm mt-1">Thanks for sharing your experience with the community.</p>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto">
+        <div className="w-full max-w-md bg-gray-900 border border-green-500/30 rounded-xl shadow-2xl">
+          <div className="flex flex-col items-center justify-center gap-4 py-16 px-8 text-center">
+            <div className="w-16 h-16 rounded-full bg-green-500/15 border border-green-500/30 flex items-center justify-center">
+              <CheckCircle className="w-8 h-8 text-green-400" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-white">Review Posted!</h3>
+              <p className="text-gray-400 text-sm mt-1">Thanks for sharing your experience with the community.</p>
+            </div>
           </div>
         </div>
       </div>
@@ -328,10 +332,10 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
   }
 
   return (
-    <div className="mt-6 bg-gray-800/30 border border-gray-700 rounded-xl overflow-hidden">
-
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto">
+      <div className="w-full max-w-2xl bg-gray-900 border border-gray-700 rounded-xl shadow-2xl my-auto">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-700 px-6 py-4 bg-gray-800/50">
+        <div className="flex items-center justify-between border-b border-gray-700 px-6 py-4 bg-gray-800/50 sticky top-0 z-10 backdrop-blur-sm">
           <div>
             <h3 className="text-lg font-bold text-white">Write a Review</h3>
             <p className="text-xs text-gray-400 mt-0.5">Share your experience with the community</p>
@@ -534,6 +538,7 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
           </div>
 
         </form>
+      </div>
     </div>
   );
 }
