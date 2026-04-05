@@ -15,7 +15,7 @@ from sqlalchemy import text
 
 from ..database import engine
 from ..auth_utils import SECRET_KEY, ALGORITHM
-from ..utils.zhipu_client import extract_tags
+# from ..utils.zhipu_client import extract_tags  # AI tagging disabled
 
 # S3 Configuration
 S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "livelens-images")
@@ -111,9 +111,8 @@ def create_review(review: ReviewCreate, user_id: str = Depends(get_current_user)
     review_id = str(uuid.uuid4())
     images_json = json.dumps(review.images) if review.images else None
     
-    # Generate AI tags for this review text
-    extracted_tags = extract_tags(review.text)
-    tags_json = json.dumps(extracted_tags) if extracted_tags else None
+    extracted_tags = []
+    tags_json = None
     
     try:
         with engine.begin() as conn:
@@ -215,8 +214,7 @@ def create_review(review: ReviewCreate, user_id: str = Depends(get_current_user)
             return {
                 "message": "Review submitted successfully", 
                 "review_id": review_id, 
-                "overall_rating": overall_rating,
-                "tags": extracted_tags
+                "overall_rating": overall_rating
             }
     except HTTPException:
         raise

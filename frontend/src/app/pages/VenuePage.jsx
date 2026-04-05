@@ -3,7 +3,7 @@ import { useParams, useLocation, Link } from "react-router";
 import { venues as staticVenues } from "../data/venues.js";
 import { ReviewCard } from "../components/ReviewCard.jsx";
 import { ReviewFormModal } from "../components/ReviewFormModal.jsx";
-import { Star, MapPin, ArrowLeft, ChevronDown, PenLine, Box } from "lucide-react";
+import { Star, MapPin, ArrowLeft, ChevronDown, PenLine, Box, CheckCircle, Loader2 } from "lucide-react";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import { Venue3DModal } from "../components/Venue3DModal.jsx";
 
@@ -26,7 +26,14 @@ export function VenuePage() {
   const [loading, setLoading] = useState(!venue);
   const [reviews, setReviews] = useState([]);
   const [showReviewForm, setShowReviewForm] = useState(false);
-  const [reviewSortId, setReviewSortId] = useState("relevance");
+  const [reviewsKey, setReviewsKey] = useState(0);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const successTimerRef = useRef(null);
+  const [reviewOffset, setReviewOffset] = useState(0);
+  const [reviewTotal, setReviewTotal] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const PAGE_SIZE = 20;
+  const [reviewSortId, setReviewSortId] = useState("most_recent");
   const [reviewSortOpen, setReviewSortOpen] = useState(false);
   const [sections, setSections] = useState([]);
   const [filterSection, setFilterSection] = useState("");
@@ -84,13 +91,31 @@ export function VenuePage() {
   }, [venueId]);
 
   useEffect(() => {
-    const params = new URLSearchParams({ venue_id: venueId, limit: 20, sort_by: reviewSortBy, order: reviewOrder });
+    // Reset to first page whenever filters/sort/key change
+    setReviewOffset(0);
+    const params = new URLSearchParams({ venue_id: venueId, limit: PAGE_SIZE, offset: 0, sort_by: reviewSortBy, order: reviewOrder });
     if (filterSection) params.set("section", filterSection);
     fetch(`${API_BASE}/search/reviews?${params}`)
       .then((r) => r.json())
-      .then((data) => setReviews(data.results ?? []))
+      .then((data) => { setReviews(data.results ?? []); setReviewTotal(data.total ?? 0); })
       .catch(() => setReviews([]));
-  }, [venueId, reviewSortBy, reviewOrder, filterSection]);
+  }, [venueId, reviewSortBy, reviewOrder, filterSection, reviewsKey]);
+
+  function loadMoreReviews() {
+    const nextOffset = reviewOffset + PAGE_SIZE;
+    setLoadingMore(true);
+    const params = new URLSearchParams({ venue_id: venueId, limit: PAGE_SIZE, offset: nextOffset, sort_by: reviewSortBy, order: reviewOrder });
+    if (filterSection) params.set("section", filterSection);
+    fetch(`${API_BASE}/search/reviews?${params}`)
+      .then((r) => r.json())
+      .then((data) => {
+        setReviews((prev) => [...prev, ...(data.results ?? [])]);
+        setReviewTotal(data.total ?? 0);
+        setReviewOffset(nextOffset);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingMore(false));
+  }
 
   if (loading) {
     return (
@@ -251,12 +276,58 @@ export function VenuePage() {
           </div>
 
           {showReviewForm && (
-            <ReviewFormModal venueId={venueId} onClose={() => {
-              const y = window.scrollY;
-              setShowReviewForm(false);
-              requestAnimationFrame(() => window.scrollTo(0, y));
-            }} />
+            <ReviewFormModal
+              venueId={venueId}
+              onClose={() => {
+                const y = window.scrollY;
+                setShowReviewForm(false);
+                requestAnimationFrame(() => window.scrollTo(0, y));
+              }}
+              onSuccess={() => {
+                const y = window.scrollY;
+                setShowReviewForm(false);
+                setReviewsKey((k) => k + 1);
+                requestAnimationFrame(() => window.scrollTo(0, y));
+                // show success toast
+                clearTimeout(successTimerRef.current);
+                setShowSuccess(true);
+                successTimerRef.current = setTimeout(() => setShowSuccess(false), 3000);
+              }}
+            />
           )}
+
+          {/* Success toast */}
+          <div
+            style={{
+              position: "fixed",
+              bottom: "2rem",
+              left: "50%",
+              transform: showSuccess ? "translate(-50%, 0)" : "translate(-50%, 120%)",
+              opacity: showSuccess ? 1 : 0,
+              transition: "transform 0.35s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s ease",
+              zIndex: 9999,
+              pointerEvents: "none",
+            }}
+          >
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.75rem",
+              padding: "0.875rem 1.5rem",
+              background: "linear-gradient(135deg, #1a2e1a 0%, #0f2410 100%)",
+              border: "1px solid rgba(74,222,128,0.35)",
+              borderRadius: "1rem",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(74,222,128,0.1)",
+              backdropFilter: "blur(12px)",
+              minWidth: "280px",
+            }}>
+              <CheckCircle style={{ width: "1.25rem", height: "1.25rem", color: "#4ade80", flexShrink: 0 }} />
+              <div>
+                <p style={{ margin: 0, fontWeight: 600, color: "#f0fdf4", fontSize: "0.9rem" }}>Review posted!</p>
+                <p style={{ margin: 0, color: "rgba(240,253,244,0.55)", fontSize: "0.75rem", marginTop: "0.1rem" }}>Thanks for sharing your experience.</p>
+              </div>
+            </div>
+          </div>
 
           <div className="space-y-4">
             {reviews.map((review) => (
@@ -264,7 +335,9 @@ export function VenuePage() {
                 key={review.id}
                 review={{
                   id: review.id,
-                  author: "Verified Attendee",
+                  author: review.is_incognito
+                    ? "Anonymous"
+                    : (review.email ? review.email.split("@")[0] : "Verified Attendee"),
                   seatInfo: review.section && review.row ? `Section ${review.section}, Row ${review.row}${review.seat_number ? `, Seat ${review.seat_number}` : ""}` : null,
                   date: review.created_at ?? new Date().toISOString(),
                   rating: review.overall_rating,
@@ -277,6 +350,23 @@ export function VenuePage() {
               />
             ))}
           </div>
+
+          {/* Load More */}
+          {reviews.length < reviewTotal && (
+            <div className="flex justify-center mt-6">
+              <button
+                onClick={loadMoreReviews}
+                disabled={loadingMore}
+                className="flex items-center gap-2 px-6 py-2.5 bg-gray-700/60 hover:bg-gray-700 disabled:opacity-50 border border-gray-600 hover:border-gray-500 text-gray-200 text-sm font-medium rounded-lg transition-all"
+              >
+                {loadingMore ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" />Loading...</>
+                ) : (
+                  `Load more (${reviewTotal - reviews.length} remaining)`
+                )}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* 3D Modal */}

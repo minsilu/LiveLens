@@ -60,7 +60,7 @@ def search_reviews(
                 params["event_id"] = event_id
 
             if venue_id:
-                conditions.append("e.venue_id = :venue_id")
+                conditions.append("r.venue_id = :venue_id")
                 params["venue_id"] = venue_id
 
             if section:
@@ -86,10 +86,12 @@ def search_reviews(
                 SELECT r.id, r.user_id, r.event_id, r.seat_id,
                        r.rating_visual, r.rating_sound, r.rating_value, r.overall_rating,
                        r.price_paid, r.text, r.images, r.tags, r.created_at,
-                       s.section, s.row, s.seat_number
+                       s.section, s.row, s.seat_number,
+                       u.email, u.is_incognito
                 FROM Reviews r
                 LEFT JOIN Events e ON r.event_id = e.id
                 LEFT JOIN Seats s ON r.seat_id = s.id
+                LEFT JOIN Users u ON r.user_id = u.id
                 {where_clause}
                 ORDER BY r.{sort_by} {order}
                 LIMIT :limit OFFSET :offset
@@ -123,6 +125,8 @@ def search_reviews(
                     "section": row[13],
                     "row": row[14],
                     "seat_number": row[15],
+                    "email": row[16],
+                    "is_incognito": bool(row[17]) if row[17] is not None else False,
                 })
 
             return {
