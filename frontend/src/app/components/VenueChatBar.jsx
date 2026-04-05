@@ -1,16 +1,17 @@
 import { useState, useRef, useEffect } from "react";
 import { Send, Sparkles, ChevronDown } from "lucide-react";
 
-export function VenueChatBar({ venueName }) {
+export function VenueChatBar({ venueName, venueId }) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
 
   useEffect(() => {
-    if (isExpanded && messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    if (isExpanded && messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
   }, [messages, isExpanded]);
 
@@ -28,8 +29,8 @@ export function VenueChatBar({ venueName }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          input_data: userText,
-          instructions: `You are a helpful venue assistant for ${venueName}. Answer questions about the venue, seating, events, and visitor experience clearly and concisely.`,
+          input_data: { question: userText, venue_name: venueName, venue_id: venueId },
+          instructions: `You are a helpful venue assistant for ${venueName}. Always use the DB functions before answering. Never guess or fabricate ratings, reviews, or events.`,
         }),
       });
 
@@ -80,7 +81,7 @@ export function VenueChatBar({ venueName }) {
 
       {/* Messages panel */}
       {isExpanded && messages.length > 0 && (
-        <div className="border-t border-gray-700/50 px-4 py-3 max-h-64 overflow-y-auto space-y-3">
+        <div ref={messagesContainerRef} className="border-t border-gray-700/50 px-4 py-3 max-h-64 overflow-y-auto space-y-3">
           {messages.map((msg, i) => (
             <div key={i} className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}>
               <div className={`max-w-[80%] px-3 py-2 rounded-xl text-sm leading-relaxed ${
@@ -99,7 +100,6 @@ export function VenueChatBar({ venueName }) {
               </div>
             </div>
           )}
-          <div ref={messagesEndRef} />
         </div>
       )}
     </div>

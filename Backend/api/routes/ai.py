@@ -58,6 +58,173 @@ def fetch_venue_stats(venue_name: str):
         return json.dumps({"error": f"No venue found matching '{venue_name}'."})
     return json.dumps(venues, default=str)
 
+def fetch_venue_review_stats(venue_name: str):
+    if not engine:
+        return json.dumps({"error": "Database not configured."})
+    query = """
+        SELECT
+            COUNT(*) as total_reviews,
+            SUM(CASE WHEN overall_rating = 5 THEN 1 ELSE 0 END) as five_star,
+            SUM(CASE WHEN overall_rating = 4 THEN 1 ELSE 0 END) as four_star,
+            SUM(CASE WHEN overall_rating = 3 THEN 1 ELSE 0 END) as three_star,
+            SUM(CASE WHEN overall_rating = 2 THEN 1 ELSE 0 END) as two_star,
+            SUM(CASE WHEN overall_rating = 1 THEN 1 ELSE 0 END) as one_star
+        FROM Reviews r
+        JOIN Venues v ON r.venue_id = v.id
+        WHERE v.name ILIKE :venue_name
+    """
+    with engine.connect() as conn:
+        result = conn.execute(text(query), {"venue_name": f"%{venue_name}%"})
+        row = result.fetchone()
+        if not row:
+            return json.dumps({"error": f"No reviews found for '{venue_name}'."})
+        return json.dumps(dict(row._mapping), default=str)
+
+def fetch_venue_reviews(venue_name: str, limit: int = 5, min_rating: int = None):
+    if not engine:
+        return json.dumps({"error": "Database not configured."})
+    query = """
+        SELECT r.text, r.overall_rating, r.rating_visual, r.rating_sound, r.rating_value,
+               r.section, r.row, r.seat_number, r.created_at
+        FROM Reviews r
+        JOIN Venues v ON r.venue_id = v.id
+        WHERE v.name ILIKE :venue_name
+          AND r.text IS NOT NULL AND r.text != ''
+          {min_rating_filter}
+        ORDER BY r.overall_rating DESC
+        LIMIT :limit
+    """
+    min_rating_filter = "AND r.overall_rating >= :min_rating" if min_rating is not None else ""
+    query = query.format(min_rating_filter=min_rating_filter)
+    params = {"venue_name": f"%{venue_name}%", "limit": limit}
+    if min_rating is not None:
+        params["min_rating"] = min_rating
+    with engine.connect() as conn:
+        result = conn.execute(text(query), params)
+        reviews = [dict(row._mapping) for row in result]
+    if not reviews:
+        return json.dumps({"error": f"No reviews found for '{venue_name}'."})
+    return json.dumps(reviews, default=str)
+
+def fetch_best_seats(venue_name: str, limit: int = 10, section: str = None):
+    if not engine:
+        return json.dumps({"error": "Database not configured."})
+    section_filter = "AND s.section ILIKE :section" if section else ""
+    query = f"""
+        SELECT s.section, s.row, s.seat_number,
+               sa.avg_overall, sa.avg_visual, sa.avg_sound, sa.avg_value, sa.review_count
+        FROM Seats s
+        JOIN Venues v ON s.venue_id = v.id
+        JOIN SeatAggregates sa ON s.id = sa.seat_id
+        WHERE v.name ILIKE :venue_name
+          AND sa.review_count >= 1
+          {section_filter}
+        ORDER BY sa.avg_overall DESC, sa.review_count DESC
+        LIMIT :limit
+    """
+    params = {"venue_name": f"%{venue_name}%", "limit": limit}
+    if section:
+        params["section"] = f"%{section}%"
+    with engine.connect() as conn:
+        result = conn.execute(text(query), params)
+        seats = [dict(row._mapping) for row in result]
+    if not seats:
+        return json.dumps({"error": f"No seat data found for '{venue_name}'" + (f" section {section}" if section else "") + "."})
+    return json.dumps(seats, default=str)
+
+def fetch_section_stats(venue_name: str, sort_by: str = "avg_overall"):
+    if not engine:
+        return json.dumps({"error": "Database not configured."})
+    allowed = {"avg_overall", "avg_visual", "avg_sound", "avg_value"}
+    if sort_by not in allowed:
+        sort_by = "avg_overall"
+    query = f"""
+        SELECT s.section,
+               ROUND(AVG(sa.avg_overall)::numeric, 2) as avg_overall,
+               ROUND(AVG(sa.avg_visual)::numeric, 2) as avg_visual,
+               ROUND(AVG(sa.avg_sound)::numeric, 2) as avg_sound,
+               ROUND(AVG(sa.avg_value)::numeric, 2) as avg_value,
+               SUM(sa.review_count) as total_reviews
+        FROM Seats s
+        JOIN Venues v ON s.venue_id = v.id
+        JOIN SeatAggregates sa ON s.id = sa.seat_id
+        WHERE v.name ILIKE :venue_name
+          AND sa.review_count >= 1
+        GROUP BY s.section
+        ORDER BY {sort_by} DESC
+        LIMIT 10
+    """
+    with engine.connect() as conn:
+        result = conn.execute(text(query), {"venue_name": f"%{venue_name}%"})
+        sections = [dict(row._mapping) for row in result]
+    if not sections:
+        return json.dumps({"error": f"No section data found for '{venue_name}'."})
+    return json.dumps(sections, default=str)
+
+def fetch_worst_seats(venue_name: str, limit: int = 5, section: str = None):
+    if not engine:
+        return json.dumps({"error": "Database not configured."})
+    section_filter = "AND s.section ILIKE :section" if section else ""
+    query = f"""
+        SELECT s.section, s.row, s.seat_number,
+               sa.avg_overall, sa.avg_visual, sa.avg_sound, sa.avg_value, sa.review_count
+        FROM Seats s
+        JOIN Venues v ON s.venue_id = v.id
+        JOIN SeatAggregates sa ON s.id = sa.seat_id
+        WHERE v.name ILIKE :venue_name
+          AND sa.review_count >= 2
+          {section_filter}
+        ORDER BY sa.avg_overall ASC, sa.review_count DESC
+        LIMIT :limit
+    """
+    params = {"venue_name": f"%{venue_name}%", "limit": limit}
+    if section:
+        params["section"] = f"%{section}%"
+    with engine.connect() as conn:
+        result = conn.execute(text(query), params)
+        seats = [dict(row._mapping) for row in result]
+    if not seats:
+        return json.dumps({"error": f"No seat data found for '{venue_name}'."})
+    return json.dumps(seats, default=str)
+
+def fetch_past_events(venue_name: str, limit: int = 10):
+    if not engine:
+        return json.dumps({"error": "Database not configured."})
+    query = """
+        SELECT e.name, e.artist, e.genre, e.event_date
+        FROM Events e
+        JOIN Venues v ON e.venue_id = v.id
+        WHERE v.name ILIKE :venue_name
+          AND e.event_date < CURRENT_DATE
+        ORDER BY e.event_date DESC
+        LIMIT :limit
+    """
+    with engine.connect() as conn:
+        result = conn.execute(text(query), {"venue_name": f"%{venue_name}%", "limit": limit})
+        events = [dict(row._mapping) for row in result]
+    if not events:
+        return json.dumps({"message": f"No past events found for '{venue_name}'."})
+    return json.dumps(events, default=str)
+
+def fetch_venue_events(venue_name: str):
+    if not engine:
+        return json.dumps({"error": "Database not configured."})
+    query = """
+        SELECT e.name, e.artist, e.genre, e.event_date, e.ticket_url
+        FROM Events e
+        JOIN Venues v ON e.venue_id = v.id
+        WHERE v.name ILIKE :venue_name
+          AND e.event_date >= CURRENT_DATE
+        ORDER BY e.event_date ASC
+        LIMIT 10
+    """
+    with engine.connect() as conn:
+        result = conn.execute(text(query), {"venue_name": f"%{venue_name}%"})
+        events = [dict(row._mapping) for row in result]
+    if not events:
+        return json.dumps({"message": f"No upcoming events found for '{venue_name}'."})
+    return json.dumps(events, default=str)
+
 def fetch_seat_stats(venue_name: str, section: str, row: str, seat_number: str):
     if not engine:
         return json.dumps({"error": "Database not configured."})
@@ -88,7 +255,14 @@ def fetch_seat_stats(venue_name: str, section: str, row: str, seat_number: str):
 TOOL_FUNCTIONS = {
     "get_top_venues": fetch_top_venues,
     "get_venue_stats": fetch_venue_stats,
-    "get_seat_stats": fetch_seat_stats
+    "get_seat_stats": fetch_seat_stats,
+    "get_venue_review_stats": fetch_venue_review_stats,
+    "get_venue_reviews": fetch_venue_reviews,
+    "get_venue_events": fetch_venue_events,
+    "get_best_seats": fetch_best_seats,
+    "get_worst_seats": fetch_worst_seats,
+    "get_section_stats": fetch_section_stats,
+    "get_past_events": fetch_past_events,
 }
 
 TOOLS_SCHEMA = [
@@ -114,6 +288,112 @@ TOOLS_SCHEMA = [
                 "type": "object",
                 "properties": {
                     "venue_name": {"type": "string", "description": "The name of the venue to search for."}
+                },
+                "required": ["venue_name"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_venue_review_stats",
+            "description": "Get the rating distribution for a specific venue: how many 1, 2, 3, 4, and 5-star reviews it has, plus total review count.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "venue_name": {"type": "string", "description": "The name of the venue to search for."}
+                },
+                "required": ["venue_name"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_venue_reviews",
+            "description": "Get actual review texts and ratings for a specific venue. Use this to find the best, most detailed, or most relevant reviews.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "venue_name": {"type": "string", "description": "The name of the venue."},
+                    "limit": {"type": "integer", "description": "Number of reviews to return. Default is 5."},
+                    "min_rating": {"type": "integer", "description": "Optional minimum overall rating filter (1-5)."}
+                },
+                "required": ["venue_name"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_venue_events",
+            "description": "Get upcoming events at a specific venue including event name, artist, genre, date, and ticket URL.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "venue_name": {"type": "string", "description": "The name of the venue."}
+                },
+                "required": ["venue_name"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_section_stats",
+            "description": "Get average ratings per section for a venue. Use this when the user asks which section has the best sound, best view, best value, or best overall experience.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "venue_name": {"type": "string", "description": "The name of the venue."},
+                    "sort_by": {"type": "string", "description": "Rating to sort by: avg_overall, avg_visual, avg_sound, or avg_value. Default is avg_overall."}
+                },
+                "required": ["venue_name"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_worst_seats",
+            "description": "Get the lowest-rated seats in a venue. Use this when the user asks which seats to avoid, worst seats, or bad seats.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "venue_name": {"type": "string", "description": "The name of the venue."},
+                    "limit": {"type": "integer", "description": "Number of seats to return. Default is 5."},
+                    "section": {"type": "string", "description": "Optional section to filter by."}
+                },
+                "required": ["venue_name"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_past_events",
+            "description": "Get past events that have been held at a venue. Use this when the user asks about events that already happened, event history, or past concerts/shows.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "venue_name": {"type": "string", "description": "The name of the venue."},
+                    "limit": {"type": "integer", "description": "Number of past events to return. Default is 10."}
+                },
+                "required": ["venue_name"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_best_seats",
+            "description": "Get the top-rated seats in a venue ranked by overall rating. Use this when the user asks for the best seat, best section, or highest rated seating in a venue, optionally filtered by section.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "venue_name": {"type": "string", "description": "The name of the venue."},
+                    "limit": {"type": "integer", "description": "Number of top seats to return. Default is 10."},
+                    "section": {"type": "string", "description": "Optional section to filter by (e.g. '2', 'A', 'Floor')."}
                 },
                 "required": ["venue_name"]
             }
@@ -185,15 +465,41 @@ async def analyze_data(request: AnalyzeRequest):
             
         # Construct the final prompt
         instruction_text = (
-             "You are an AI assistant analyzing data for the LiveLens application. "
-             "Analyze the user's needs or the following input data and provide a detailed, "
-             "helpful response based on the provided context."
+            "You are a helpful venue assistant for the LiveLens application. "
+            "ALWAYS call the appropriate database function(s) before answering any question about a venue. "
+            "Never guess or make up ratings, reviews, or events — always fetch real data from the DB first. "
+            "If the question is about ratings or stars, use get_venue_review_stats. "
+            "If the question is about reviews or comments, use get_venue_reviews. "
+            "If the question is about upcoming events, use get_venue_events. "
+            "If the question is about general venue info or averages, use get_venue_stats. "
+            "If the question is about the best seat or top seats, use get_best_seats (pass section param if user specifies a section). "
+            "If the question is about seats to avoid or worst seats, use get_worst_seats. "
+            "If the question is about which section has the best sound, view, or value, use get_section_stats with the appropriate sort_by. "
+            "If the question is about past events or event history, use get_past_events. "
+            "When presenting seat results, always show the top 3-5 options with section, row, seat number, rating, and review count. "
+            "Emphasize seats with more reviews as they are more reliable. Never pick just one — give a ranked list. "
+            "IMPORTANT: Never use markdown formatting. No **, no ##, no bullet points with -, no headers. Use plain text only."
         )
-        
+
         if request.instructions:
-            instruction_text += f"\nExtra instructions from user: {request.instructions}"
-            
-        full_prompt = f"Input Data to Analyze:\n{formatted_input}"
+            instruction_text += f"\n{request.instructions}"
+
+        # Support structured input with question + venue context
+        if isinstance(request.input_data, dict):
+            question = request.input_data.get("question", "")
+            venue_name = request.input_data.get("venue_name", "")
+            venue_id = request.input_data.get("venue_id", "")
+            context_parts = []
+            if venue_name:
+                context_parts.append(f"Venue: {venue_name}")
+            if venue_id:
+                context_parts.append(f"Venue ID: {venue_id}")
+            if context_parts:
+                full_prompt = f"{', '.join(context_parts)}\nQuestion: {question}"
+            else:
+                full_prompt = question or formatted_input
+        else:
+            full_prompt = formatted_input
         
         # Generate the response using Zhipu GLM-4 model
         messages = [
