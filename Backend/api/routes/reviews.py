@@ -551,3 +551,31 @@ def get_sub_reviews(review_id: str):
             }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch sub-reviews: {str(e)}")
+
+
+@router.delete("/{review_id}/sub-reviews/{sub_review_id}")
+def delete_sub_review(review_id: str, sub_review_id: str, user_id: str = Depends(get_current_user)):
+    """
+    Delete a sub-review (comment). Only the author can delete their own comment.
+    """
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    try:
+        with engine.begin() as conn:
+            row = conn.execute(
+                text("SELECT user_id FROM SubReviews WHERE id = :id AND review_id = :review_id"),
+                {"id": sub_review_id, "review_id": review_id},
+            ).fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Comment not found")
+            if str(row[0]) != user_id:
+                raise HTTPException(status_code=403, detail="You can only delete your own comments")
+            conn.execute(
+                text("DELETE FROM SubReviews WHERE id = :id"),
+                {"id": sub_review_id},
+            )
+            return {"message": "Comment deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete comment: {str(e)}")

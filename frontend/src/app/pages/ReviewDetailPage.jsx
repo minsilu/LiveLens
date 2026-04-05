@@ -15,6 +15,7 @@ import {
   Crosshair,
   MessageSquare,
   Send,
+  Trash2,
 } from "lucide-react";
 import { ImageLightbox } from "../components/ImageLightbox";
 
@@ -122,7 +123,7 @@ export function ReviewDetailPage() {
   const [submittingComment, setSubmittingComment] = useState(false);
 
   // Auth token from localStorage
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
 
   useEffect(() => {
     setLoading(true);
@@ -182,6 +183,31 @@ export function ReviewDetailPage() {
       setSubmittingComment(false);
     }
   };
+
+  const handleDeleteComment = async (subReviewId) => {
+    if (!token) return;
+    try {
+      const resp = await fetch(`${API_BASE}/reviews/${reviewId}/sub-reviews/${subReviewId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!resp.ok) throw new Error("Failed");
+      setSubReviews((prev) => prev.filter((sr) => sr.id !== subReviewId));
+    } catch {
+      // silently fail
+    }
+  };
+
+  // Extract current user ID from JWT for ownership checks
+  const currentUserId = (() => {
+    if (!token) return null;
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      return payload.sub ?? null;
+    } catch {
+      return null;
+    }
+  })();
 
   const formatDate = (ds) => {
     if (!ds) return "—";
@@ -313,35 +339,6 @@ export function ReviewDetailPage() {
                 </div>
               </div>
             )}
-
-            {/* Metadata badges */}
-            <div className="bg-gray-800/40 backdrop-blur-sm rounded-2xl border border-gray-700/50 p-5">
-              <p className="text-xs text-gray-400 mb-3 font-semibold uppercase tracking-wide">
-                Event Details
-              </p>
-              <div className="grid grid-cols-1 gap-2">
-                {review.venue_name && (
-                  <Link
-                    to={`/venue/${review.venue_id}`}
-                    className="flex items-center gap-2 px-3 py-2.5 bg-gray-800/60 rounded-xl border border-gray-700/60 hover:border-blue-500/50 transition-colors group"
-                  >
-                    <MapPin className="w-4 h-4 shrink-0 text-blue-400 group-hover:text-blue-300" />
-                    <div>
-                      <p className="text-xs text-gray-500 leading-none mb-0.5">Venue</p>
-                      <p className="text-sm font-medium text-blue-400 group-hover:text-blue-300 leading-tight">
-                        {review.venue_name}
-                      </p>
-                    </div>
-                  </Link>
-                )}
-                <MetaBadge icon={Ticket} label="Event" value={review.event_name || null} colorClass="text-purple-300" />
-                <MetaBadge icon={Calendar} label="Event Date" value={formatEventDate(review.event_date)} colorClass="text-gray-300" />
-                <MetaBadge icon={MapPin} label="Seat" value={seatLabel} colorClass="text-gray-300" />
-                {review.price_paid != null && (
-                  <MetaBadge icon={DollarSign} label="Price Paid" value={`$${Number(review.price_paid).toFixed(2)}`} colorClass="text-green-400" />
-                )}
-              </div>
-            </div>
           </div>
 
           {/* ── RIGHT COLUMN (3/5) ────────────────────────────────── */}
@@ -388,6 +385,35 @@ export function ReviewDetailPage() {
               </div>
             </div>
 
+            {/* Event Details */}
+            <div className="bg-gray-800/40 backdrop-blur-sm rounded-2xl border border-gray-700/50 p-5">
+              <p className="text-xs text-gray-400 mb-3 font-semibold uppercase tracking-wide">
+                Event Details
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {review.venue_name && (
+                  <Link
+                    to={`/venue/${review.venue_id}`}
+                    className="flex items-center gap-2 px-3 py-2.5 bg-gray-800/60 rounded-xl border border-gray-700/60 hover:border-blue-500/50 transition-colors group"
+                  >
+                    <MapPin className="w-4 h-4 shrink-0 text-blue-400 group-hover:text-blue-300" />
+                    <div>
+                      <p className="text-xs text-gray-500 leading-none mb-0.5">Venue</p>
+                      <p className="text-sm font-medium text-blue-400 group-hover:text-blue-300 leading-tight">
+                        {review.venue_name}
+                      </p>
+                    </div>
+                  </Link>
+                )}
+                <MetaBadge icon={Ticket} label="Event" value={review.event_name || null} colorClass="text-purple-300" />
+                <MetaBadge icon={Calendar} label="Event Date" value={formatEventDate(review.event_date)} colorClass="text-gray-300" />
+                <MetaBadge icon={MapPin} label="Seat" value={seatLabel} colorClass="text-gray-300" />
+                {review.price_paid != null && (
+                  <MetaBadge icon={DollarSign} label="Price Paid" value={`$${Number(review.price_paid).toFixed(2)}`} colorClass="text-green-400" />
+                )}
+              </div>
+            </div>
+
             {/* Rating Breakdown */}
             <div className="bg-gray-800/40 backdrop-blur-sm rounded-2xl border border-gray-700/50 p-6">
               <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">
@@ -415,7 +441,7 @@ export function ReviewDetailPage() {
                   {subReviews.map((sr) => (
                     <div
                       key={sr.id}
-                      className="flex gap-3 p-3 bg-gray-800/60 rounded-xl border border-gray-700/40"
+                      className="flex gap-3 p-3 bg-gray-800/60 rounded-xl border border-gray-700/40 group/comment"
                     >
                       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-cyan-500 flex items-center justify-center flex-shrink-0">
                         <User className="w-4 h-4 text-white" />
@@ -428,6 +454,15 @@ export function ReviewDetailPage() {
                           <span className="text-xs text-gray-600">
                             {formatDateShort(sr.created_at)}
                           </span>
+                          {currentUserId && sr.user_id === currentUserId && (
+                            <button
+                              onClick={() => handleDeleteComment(sr.id)}
+                              title="Delete comment"
+                              className="ml-auto p-1 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover/comment:opacity-100 transition-all"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                         <p className="text-sm text-gray-400 leading-relaxed">{sr.text}</p>
                       </div>

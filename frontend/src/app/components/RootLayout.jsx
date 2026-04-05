@@ -8,7 +8,26 @@ export function RootLayout() {
   const [isChatOpen, setIsChatOpen] = useState(false);
 
   useEffect(() => {
-    setIsLoggedIn(!!localStorage.getItem("access_token"));
+    // Check token validity on mount
+    const token = localStorage.getItem("access_token");
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        if (payload.exp && payload.exp * 1000 < Date.now()) {
+          // Token expired — clear it
+          localStorage.removeItem("access_token");
+          setIsLoggedIn(false);
+        } else {
+          setIsLoggedIn(true);
+        }
+      } catch {
+        // Malformed token — clear it
+        localStorage.removeItem("access_token");
+        setIsLoggedIn(false);
+      }
+    } else {
+      setIsLoggedIn(false);
+    }
 
     function onStorage() {
       setIsLoggedIn(!!localStorage.getItem("access_token"));

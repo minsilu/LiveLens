@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Star, Camera, ChevronDown, Loader2, CheckCircle } from "lucide-react";
+import { Link } from "react-router";
+import { X, Star, Camera, ChevronDown, Loader2, CheckCircle, LogIn, AlertCircle } from "lucide-react";
 import { ImageLightbox } from "./ImageLightbox";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
@@ -99,13 +100,17 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
   const [ratingVisual, setRatingVisual] = useState(0);
   const [ratingSound, setRatingSound] = useState(0);
   const [ratingValue, setRatingValue] = useState(0);
+  const [pricePaid, setPricePaid] = useState("");
   const [reviewText, setReviewText] = useState("");
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [lightboxIndex, setLightboxIndex] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [errors, setErrors] = useState([]);
   const fileInputRef = useRef(null);
+
+  const isLoggedIn = !!localStorage.getItem("access_token");
 
   const numSort = (a, b) => (isNaN(a) || isNaN(b) ? a.localeCompare(b) : Number(a) - Number(b));
   const sections = [...new Set(seats.map((s) => s.section))].sort(numSort);
@@ -145,7 +150,19 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
   async function handleSubmit(e) {
     e.preventDefault();
     const token = localStorage.getItem("access_token");
-    if (!token) return alert("Please log in to post a review.");
+    if (!token) return;
+
+    // Validation
+    const errs = [];
+    if (!eventId) errs.push("Please select an event.");
+    if (!section || !row || !seatNumber) errs.push("Please select your seat (section, row, and seat number).");
+    if (!ratingVisual || !ratingSound || !ratingValue) errs.push("Please rate all three categories (Visual, Sound, Value).");
+    if (!reviewText.trim()) errs.push("Please write your review.");
+    if (errs.length > 0) {
+      setErrors(errs);
+      return;
+    }
+    setErrors([]);
 
     setSubmitting(true);
     const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
@@ -162,7 +179,7 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
         rating_visual: ratingVisual,
         rating_sound: ratingSound,
         rating_value: ratingValue,
-        price_paid: 0,
+        price_paid: pricePaid ? parseFloat(pricePaid) : 0,
         text: reviewText,
       }),
     });
@@ -201,6 +218,31 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
     setSubmitting(false);
     setSubmitted(true);
     setTimeout(() => (onSuccess ?? onClose)(), 2000);
+  }
+
+  // Not logged in — show login prompt instead of form
+  if (!isLoggedIn) {
+    return (
+      <div className="mt-6 bg-gray-800/30 border border-gray-700 rounded-xl overflow-hidden">
+        <div className="flex flex-col items-center justify-center gap-4 py-12 px-8 text-center">
+          <div className="w-14 h-14 rounded-full bg-blue-500/15 border border-blue-500/30 flex items-center justify-center">
+            <LogIn className="w-7 h-7 text-blue-400" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-white">Sign in to write a review</h3>
+            <p className="text-gray-400 text-sm mt-1">Share your experience with the community</p>
+          </div>
+          <div className="flex gap-3">
+            <Link to="/login" className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
+              Sign in
+            </Link>
+            <button onClick={onClose} className="px-6 py-2.5 bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium rounded-lg transition-colors">
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (submitted) {
@@ -290,6 +332,23 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
             </div>
           </section>
 
+          {/* Price Paid */}
+          <section className="space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500">Price Paid (optional)</h3>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">$</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={pricePaid}
+                onChange={(e) => setPricePaid(e.target.value)}
+                placeholder="0.00"
+                className="w-full bg-gray-800 border border-gray-600 rounded-lg pl-8 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+              />
+            </div>
+          </section>
+
           {/* Ratings */}
           <section className="space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500">Your Ratings</h3>
@@ -360,6 +419,18 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
               />
             )}
           </section>
+
+          {/* Validation Errors */}
+          {errors.length > 0 && (
+            <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/20 space-y-1">
+              {errors.map((err, i) => (
+                <p key={i} className="text-red-400 text-sm flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                  {err}
+                </p>
+              ))}
+            </div>
+          )}
 
           {/* Footer */}
           <div className="pt-4 border-t border-gray-700 flex flex-col md:flex-row items-center justify-between gap-4">
