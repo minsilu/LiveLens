@@ -43,10 +43,10 @@ export function VenuePage() {
   const sectionFilterRef = useRef(null);
 
   const reviewSortOptions = [
-    { id: "relevance",     label: "Relevance",     sortBy: "overall_rating", order: "desc" },
-    { id: "highest",       label: "Highest Rated", sortBy: "overall_rating", order: "desc" },
-    { id: "lowest",        label: "Lowest Rated",  sortBy: "overall_rating", order: "asc" },
-    { id: "most_recent",   label: "Most Recent",   sortBy: "created_at",     order: "desc" },
+    { id: "relevance", label: "Relevance", sortBy: "overall_rating", order: "desc" },
+    { id: "highest", label: "Highest Rated", sortBy: "overall_rating", order: "desc" },
+    { id: "lowest", label: "Lowest Rated", sortBy: "overall_rating", order: "asc" },
+    { id: "most_recent", label: "Most Recent", sortBy: "created_at", order: "desc" },
   ];
 
   const activeSort = reviewSortOptions.find(o => o.id === reviewSortId) ?? reviewSortOptions[0];
@@ -113,7 +113,7 @@ export function VenuePage() {
         setReviewTotal(data.total ?? 0);
         setReviewOffset(nextOffset);
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoadingMore(false));
   }
 
@@ -182,20 +182,34 @@ export function VenuePage() {
                   <span>{location_str}</span>
                 </div>
               </div>
-              
-              {/* 3D View Button at bottom right */}
-              <button 
-                onClick={() => setShow3DModal(true)}
-                className="group flex items-center gap-3 px-5 py-3 bg-gray-900/60 hover:bg-black/70 backdrop-blur-md rounded-2xl border border-white/10 hover:border-blue-500/50 text-white font-medium transition-all duration-300 shadow-[0_8px_30px_rgba(0,0,0,0.5)] hover:shadow-[0_10px_40px_rgba(59,130,246,0.25)] hover:-translate-y-1"
-              >
-                <div className="bg-blue-500/20 p-2.5 rounded-xl group-hover:bg-blue-500/40 transition-colors border border-blue-500/20">
-                  <Box className="w-5 h-5 text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
-                </div>
-                <div className="flex flex-col items-start pr-1">
-                  <span className="text-sm font-semibold tracking-wide text-gray-100 group-hover:text-white transition-colors">3D View</span>
-                  <span className="text-[10px] text-blue-300/70 font-mono tracking-wider">INTERACTIVE</span>
-                </div>
-              </button>
+
+              {/* Action Buttons at bottom right */}
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setShowReviewForm(true)}
+                  className="group flex items-center gap-3 px-5 py-3 bg-gray-900/60 hover:bg-black/70 backdrop-blur-md rounded-2xl border border-white/10 hover:border-green-500/50 text-white font-medium transition-all duration-300 shadow-[0_8px_30px_rgba(0,0,0,0.5)] hover:shadow-[0_10px_40px_rgba(74,222,128,0.25)] hover:-translate-y-1"
+                >
+                  <div className="bg-green-500/20 p-2.5 rounded-xl group-hover:bg-green-500/40 transition-colors border border-green-500/20">
+                    <PenLine className="w-5 h-5 text-green-400 drop-shadow-[0_0_8px_rgba(74,222,128,0.8)]" />
+                  </div>
+                  <div className="flex flex-col items-start pr-1">
+                    <span className="text-sm font-semibold tracking-wide text-gray-100 group-hover:text-white transition-colors">Write Review</span>
+                    <span className="text-[10px] text-blue-300/70 font-mono tracking-wider">SHARE YOUR EXPERIENCE</span>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setShow3DModal(true)}
+                  className="group flex items-center gap-3 px-5 py-3 bg-gray-900/60 hover:bg-black/70 backdrop-blur-md rounded-2xl border border-white/10 hover:border-blue-500/50 text-white font-medium transition-all duration-300 shadow-[0_8px_30px_rgba(0,0,0,0.5)] hover:shadow-[0_10px_40px_rgba(59,130,246,0.25)] hover:-translate-y-1"
+                >
+                  <div className="bg-blue-500/20 p-2.5 rounded-xl group-hover:bg-blue-500/40 transition-colors border border-blue-500/20">
+                    <Box className="w-5 h-5 text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
+                  </div>
+                  <div className="flex flex-col items-start pr-1">
+                    <span className="text-sm font-semibold tracking-wide text-gray-100 group-hover:text-white transition-colors">3D View</span>
+                    <span className="text-[10px] text-blue-300/70 font-mono tracking-wider">INTERACTIVE</span>
+                  </div>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -207,73 +221,64 @@ export function VenuePage() {
               <p className="text-gray-400 mt-1">{reviews.length > 0 ? `${reviews.length} reviews shown` : "No reviews yet"}</p>
             </div>
             <div className="flex items-center gap-3">
-            <div ref={sectionFilterRef} className="relative">
-              <button
-                onClick={() => setSectionFilterOpen(o => !o)}
-                className="flex items-center justify-between gap-2 px-4 py-2 rounded-lg bg-gray-800/50 border border-gray-700 text-white hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 whitespace-nowrap w-36"
-              >
-                <span className="truncate">
-                  Section: <span className="text-gray-300">{filterSection || "All"}</span>
-                </span>
-                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${sectionFilterOpen ? "rotate-180" : ""}`} />
-              </button>
-              {sectionFilterOpen && (
-                <div className="absolute right-0 mt-2 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10 overflow-hidden max-h-56 overflow-y-auto">
-                  <button
-                    onClick={() => { setFilterSection(""); setSectionFilterOpen(false); }}
-                    className={`w-full text-left px-4 py-3 text-sm transition-colors hover:bg-gray-700 ${!filterSection ? "text-blue-400 bg-gray-700/50" : "text-gray-200"}`}
-                  >
-                    All Sections
-                  </button>
-                  {sections.map((s) => (
+              <div ref={sectionFilterRef} className="relative">
+                <button
+                  onClick={() => setSectionFilterOpen(o => !o)}
+                  className="flex items-center justify-between gap-2 px-4 py-2 rounded-lg bg-gray-800/50 border border-gray-700 text-white hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 whitespace-nowrap w-36"
+                >
+                  <span className="truncate">
+                    Section: <span className="text-gray-300">{filterSection || "All"}</span>
+                  </span>
+                  <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${sectionFilterOpen ? "rotate-180" : ""}`} />
+                </button>
+                {sectionFilterOpen && (
+                  <div className="absolute right-0 mt-2 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10 overflow-hidden max-h-56 overflow-y-auto">
                     <button
-                      key={s}
-                      onClick={() => { setFilterSection(s); setSectionFilterOpen(false); }}
-                      className={`w-full text-left px-4 py-3 text-sm transition-colors hover:bg-gray-700 ${filterSection === s ? "text-blue-400 bg-gray-700/50" : "text-gray-200"}`}
+                      onClick={() => { setFilterSection(""); setSectionFilterOpen(false); }}
+                      className={`w-full text-left px-4 py-3 text-sm transition-colors hover:bg-gray-700 ${!filterSection ? "text-blue-400 bg-gray-700/50" : "text-gray-200"}`}
                     >
-                      {s}
+                      All Sections
                     </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div ref={reviewSortRef} className="relative">
-              <button
-                onClick={() => setReviewSortOpen(o => !o)}
-                className="flex items-center justify-between gap-2 px-4 py-2 rounded-lg bg-gray-800/50 border border-gray-700 text-white hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 whitespace-nowrap w-60"
-              >
-                <span className="truncate">Sort by: <span className="text-gray-300">{activeSort.label}</span></span>
-                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${reviewSortOpen ? "rotate-180" : ""}`} />
-              </button>
-              {reviewSortOpen && (
-                <div className="absolute right-0 mt-2 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10 overflow-hidden">
-                  {reviewSortOptions.map((opt) => (
-                    <button
-                      key={`${opt.sortBy}-${opt.order}`}
-                      onClick={() => { setReviewSortId(opt.id); setReviewSortOpen(false); }}
-                      className={`w-full text-left px-4 py-3 text-sm transition-colors hover:bg-gray-700 ${
-                        reviewSortId === opt.id
+                    {sections.map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => { setFilterSection(s); setSectionFilterOpen(false); }}
+                        className={`w-full text-left px-4 py-3 text-sm transition-colors hover:bg-gray-700 ${filterSection === s ? "text-blue-400 bg-gray-700/50" : "text-gray-200"}`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div ref={reviewSortRef} className="relative">
+                <button
+                  onClick={() => setReviewSortOpen(o => !o)}
+                  className="flex items-center justify-between gap-2 px-4 py-2 rounded-lg bg-gray-800/50 border border-gray-700 text-white hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 whitespace-nowrap w-60"
+                >
+                  <span className="truncate">Sort by: <span className="text-gray-300">{activeSort.label}</span></span>
+                  <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${reviewSortOpen ? "rotate-180" : ""}`} />
+                </button>
+                {reviewSortOpen && (
+                  <div className="absolute right-0 mt-2 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10 overflow-hidden">
+                    {reviewSortOptions.map((opt) => (
+                      <button
+                        key={`${opt.sortBy}-${opt.order}`}
+                        onClick={() => { setReviewSortId(opt.id); setReviewSortOpen(false); }}
+                        className={`w-full text-left px-4 py-3 text-sm transition-colors hover:bg-gray-700 ${reviewSortId === opt.id
                           ? "text-blue-400 bg-gray-700/50"
                           : "text-gray-200"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+                          }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-          <div className="flex justify-end mb-4">
-            <button
-              onClick={() => setShowReviewForm(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
-            >
-              <PenLine className="w-4 h-4" />
-              Write a Review
-            </button>
-          </div>
+
 
           {showReviewForm && (
             <ReviewFormModal
@@ -371,9 +376,9 @@ export function VenuePage() {
 
         {/* 3D Modal */}
         {show3DModal && (
-          <Venue3DModal 
-            venueName={venue.name} 
-            onClose={() => setShow3DModal(false)} 
+          <Venue3DModal
+            venueName={venue.name}
+            onClose={() => setShow3DModal(false)}
           />
         )}
       </div>
