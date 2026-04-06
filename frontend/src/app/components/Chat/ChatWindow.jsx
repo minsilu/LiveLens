@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import './ChatWindow.css';
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+
 const ChatWindow = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -20,7 +22,7 @@ const ChatWindow = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/ai/analyze', {
+      const response = await fetch(`${API_BASE}/ai/analyze`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

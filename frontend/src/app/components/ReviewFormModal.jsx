@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router";
 import { X, Star, Camera, ChevronDown, Loader2, CheckCircle, LogIn, AlertCircle } from "lucide-react";
+import { createPortal } from "react-dom";
 import { ImageLightbox } from "./ImageLightbox";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
@@ -108,26 +109,47 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [errors, setErrors] = useState([]);
+  const [draftId, setDraftId] = useState(null);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
   const fileInputRef = useRef(null);
 
   const isLoggedIn = !!localStorage.getItem("access_token");
-
-  const numSort = (a, b) => (isNaN(a) || isNaN(b) ? a.localeCompare(b) : Number(a) - Number(b));
-  const sections = [...new Set(seats.map((s) => s.section))].sort(numSort);
-  const rows = [...new Set(seats.filter((s) => s.section === section).map((s) => s.row))].sort(numSort);
-  const seatNumbers = [...new Set(seats.filter((s) => s.section === section && s.row === row).map((s) => s.seat_number))].sort(numSort);
 
   useEffect(() => {
     fetch(`${API_BASE}/review-form/events?venue_id=${venueId}`)
       .then((r) => r.json())
       .then((data) => setEvents(Array.isArray(data) ? data : []))
       .catch(() => setEvents([]));
-
-    fetch(`${API_BASE}/search/seats?venue_id=${venueId}&limit=2000`)
-      .then((r) => r.json())
-      .then((data) => setSeats(data.results ?? []))
-      .catch(() => setSeats([]));
   }, [venueId]);
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const token = localStorage.getItem("access_token");
+    fetch(`${API_BASE}/review-drafts/`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(r => r.json())
+      .then(drafts => {
+        if (!Array.isArray(drafts)) return;
+        const venueDraft = drafts.find(d => d.draft_data?.venue_id === venueId);
+        if (venueDraft) {
+          setDraftId(venueDraft.id);
+          const data = venueDraft.draft_data;
+          if (data.event_id) setEventId(data.event_id);
+          if (data.section) setSection(data.section);
+          if (data.row) setRow(data.row);
+          if (data.seat_number) setSeatNumber(data.seat_number);
+          if (data.rating_visual) setRatingVisual(data.rating_visual);
+          if (data.rating_sound) setRatingSound(data.rating_sound);
+          if (data.rating_value) setRatingValue(data.rating_value);
+          if (data.price_paid) setPricePaid(data.price_paid);
+          if (data.text) setReviewText(data.text);
+          if (data.is_anonymous !== undefined) setIsAnonymous(data.is_anonymous);
+        }
+      })
+      .catch(console.error);
+  }, [venueId, isLoggedIn]);
 
   function handleFileChange(e) {
     const files = Array.from(e.target.files);
@@ -145,6 +167,44 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
       URL.revokeObjectURL(prev[index].preview);
       return prev.filter((_, i) => i !== index);
     });
+  }
+
+  async function handleSaveDraft() {
+    const token = localStorage.getItem("access_token");
+    if (!token) return;
+    setSavingDraft(true);
+
+    const draftData = {
+      venue_id: venueId,
+      event_id: eventId,
+      section,
+      row,
+      seat_number: seatNumber,
+      rating_visual: ratingVisual,
+      rating_sound: ratingSound,
+      rating_value: ratingValue,
+      price_paid: pricePaid,
+      text: reviewText,
+      is_anonymous: isAnonymous
+    };
+
+    try {
+      const res = await fetch(`${API_BASE}/review-drafts/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ id: draftId, draft_data: draftData })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDraftId(data.draft_id);
+        setDraftSaved(true);
+        setTimeout(() => setDraftSaved(false), 2000);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSavingDraft(false);
+    }
   }
 
   async function handleSubmit(e) {
@@ -215,6 +275,13 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
       }
     }
 
+    if (draftId) {
+      await fetch(`${API_BASE}/review-drafts/delete?draft_id=${draftId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    }
+
     setSubmitting(false);
     setSubmitted(true);
     setTimeout(() => (onSuccess ?? onClose)(), 2000);
@@ -222,64 +289,91 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
 
   // Not logged in — show login prompt instead of form
   if (!isLoggedIn) {
-    return (
-      <div className="mt-6 bg-gray-800/30 border border-gray-700 rounded-xl overflow-hidden">
-        <div className="flex flex-col items-center justify-center gap-4 py-12 px-8 text-center">
-          <div className="w-14 h-14 rounded-full bg-blue-500/15 border border-blue-500/30 flex items-center justify-center">
-            <LogIn className="w-7 h-7 text-blue-400" />
-          </div>
-          <div>
-            <h3 className="text-lg font-bold text-white">Sign in to write a review</h3>
-            <p className="text-gray-400 text-sm mt-1">Share your experience with the community</p>
-          </div>
-          <div className="flex gap-3">
-            <Link to="/login" className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
-              Sign in
-            </Link>
-            <button onClick={onClose} className="px-6 py-2.5 bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium rounded-lg transition-colors">
-              Cancel
-            </button>
+    return createPortal(
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto">
+        <div className="w-full max-w-md bg-gray-900 border border-gray-700 rounded-xl shadow-2xl">
+          <div className="flex flex-col items-center justify-center gap-4 py-12 px-8 text-center">
+            <div className="w-14 h-14 rounded-full bg-blue-500/15 border border-blue-500/30 flex items-center justify-center">
+              <LogIn className="w-7 h-7 text-blue-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-white">Sign in to write a review</h3>
+              <p className="text-gray-400 text-sm mt-1">Share your experience with the community</p>
+            </div>
+            <div className="flex gap-3">
+              <Link to="/login" className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
+                Sign in
+              </Link>
+              <button onClick={onClose} className="px-6 py-2.5 bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium rounded-lg transition-colors">
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      </div>,
+      document.body
     );
   }
 
   if (submitted) {
-    return (
-      <div className="mt-6 bg-gray-800/30 border border-gray-700 rounded-xl overflow-hidden">
-        <div className="flex flex-col items-center justify-center gap-4 py-16 px-8 text-center">
-          <div className="w-16 h-16 rounded-full bg-green-500/15 border border-green-500/30 flex items-center justify-center">
-            <CheckCircle className="w-8 h-8 text-green-400" />
-          </div>
-          <div>
-            <h3 className="text-xl font-bold text-white">Review Posted!</h3>
-            <p className="text-gray-400 text-sm mt-1">Thanks for sharing your experience with the community.</p>
+    return createPortal(
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto">
+        <div className="w-full max-w-md bg-gray-900 border border-green-500/30 rounded-xl shadow-2xl">
+          <div className="flex flex-col items-center justify-center gap-4 py-16 px-8 text-center">
+            <div className="w-16 h-16 rounded-full bg-green-500/15 border border-green-500/30 flex items-center justify-center">
+              <CheckCircle className="w-8 h-8 text-green-400" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-white">Review Posted!</h3>
+              <p className="text-gray-400 text-sm mt-1">Thanks for sharing your experience with the community.</p>
+            </div>
           </div>
         </div>
-      </div>
+      </div>,
+      document.body
     );
   }
 
-  return (
-    <div className="mt-6 bg-gray-800/30 border border-gray-700 rounded-xl overflow-hidden">
-
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+      <div className="w-full max-w-2xl bg-gray-900 border border-gray-700 rounded-xl shadow-2xl flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-700 px-6 py-4 bg-gray-800/50">
+        <div className="flex items-center justify-between border-b border-gray-700 px-6 py-4 bg-gray-800/50 sticky top-0 z-10 backdrop-blur-sm shrink-0">
           <div>
             <h3 className="text-lg font-bold text-white">Write a Review</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Share your experience with the community</p>
+            <p className="text-xs text-gray-400 mt-0.5">Share your experience</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-700 transition-colors"
-          >
-            <X className="w-5 h-5 text-gray-400" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleSaveDraft}
+              disabled={savingDraft || submitting}
+              className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium rounded-lg transition-all flex items-center gap-1"
+            >
+              {savingDraft ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+              {draftSaved ? "Saved!" : "Save Draft"}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium rounded-lg transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={submitting}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-70 text-white text-sm font-bold rounded-lg shadow-lg shadow-blue-500/20 transition-all flex items-center gap-1"
+            >
+              {submitting ? (
+                <><Loader2 className="w-3 h-3 animate-spin" />Posting...</>
+              ) : "Post"}
+            </button>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-8">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto w-full" style={{scrollbarWidth: 'thin'}}>
 
           {/* Event Selection */}
           <section className="space-y-3">
@@ -293,41 +387,36 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
           {/* Seat Details */}
           <section className="space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500">Seat Details</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1.5">Section</label>
-                <select
+                <input
+                  type="text"
                   value={section}
-                  onChange={(e) => { setSection(e.target.value); setRow(""); setSeatNumber(""); }}
-                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
-                >
-                  <option value="">Select section...</option>
-                  {sections.map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
+                  onChange={(e) => setSection(e.target.value)}
+                  placeholder="e.g. 101"
+                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1.5">Row</label>
-                <select
+                <input
+                  type="text"
                   value={row}
-                  onChange={(e) => { setRow(e.target.value); setSeatNumber(""); }}
-                  disabled={!section}
-                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none disabled:opacity-40"
-                >
-                  <option value="">Select row...</option>
-                  {rows.map((r) => <option key={r} value={r}>{r}</option>)}
-                </select>
+                  onChange={(e) => setRow(e.target.value)}
+                  placeholder="e.g. A"
+                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">Seat Number</label>
-                <select
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">Seat No</label>
+                <input
+                  type="text"
                   value={seatNumber}
                   onChange={(e) => setSeatNumber(e.target.value)}
-                  disabled={!row}
-                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none disabled:opacity-40"
-                >
-                  <option value="">Select seat...</option>
-                  {seatNumbers.map((n) => <option key={n} value={n}>{n}</option>)}
-                </select>
+                  placeholder="e.g. 1"
+                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
             </div>
           </section>
@@ -432,8 +521,7 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
             </div>
           )}
 
-          {/* Footer */}
-          <div className="pt-4 border-t border-gray-700 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="pt-2 border-t border-gray-700 mt-4">
             <label className="flex items-center gap-3 cursor-pointer">
               <input
                 type="checkbox"
@@ -443,27 +531,11 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
               />
               <span className="text-sm text-gray-400">Post review anonymously</span>
             </label>
-            <div className="flex gap-3 w-full md:w-auto">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 md:flex-none px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-lg transition-all active:scale-95"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="flex-1 md:flex-none px-10 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-70 text-white font-bold rounded-lg shadow-lg shadow-blue-500/20 transition-all active:scale-95 flex items-center justify-center gap-2"
-              >
-                {submitting ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" />Posting...</>
-                ) : "Post Review"}
-              </button>
-            </div>
           </div>
 
         </form>
-    </div>
+      </div>
+    </div>,
+    document.body
   );
 }
