@@ -104,7 +104,10 @@ def search_venues(
                 SELECT v.id, v.name, v.city, v.capacity, v.tags,
                        ROUND(AVG(r.overall_rating), 1) as avg_rating,
                        COUNT(r.id) as review_count,
-                       v.seat_map_2d_url, v.seat_map_meta
+                       v.seat_map_2d_url, v.seat_map_meta,
+                       (SELECT COUNT(*) FROM Events e2
+                        WHERE e2.venue_id = v.id
+                          AND e2.event_date >= DATE('now')) as upcoming_events
                 FROM Venues v
                 LEFT JOIN Seats s ON s.venue_id = v.id
                 LEFT JOIN Reviews r ON r.seat_id = s.id
@@ -145,6 +148,7 @@ def search_venues(
                     "review_count": row[6],
                     "seat_map_2d_url": row[7],
                     "seat_map_meta": row[8],
+                    "upcoming_events": row[9] if len(row) > 9 else 0,
                     "image_url": f"{base_url}/facade.png",
                     "image_urls": image_urls
                 })

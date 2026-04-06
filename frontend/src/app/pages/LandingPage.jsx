@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router";
 import { venues as staticVenues } from "../data/venues.js";
 import { VenueCard } from "../components/VenueCard.jsx";
+import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import { Search, Music, Users, Star, TrendingUp, ChevronDown } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
@@ -167,16 +168,9 @@ export function LandingPage() {
                   )}
                 </div>
               ) : (
-                <img 
+                <ImageWithFallback
                   src={featuredVenue?.image_url || featuredVenue?.image || staticVenues[0].image}
                   alt={featuredVenue ? featuredVenue.name : "Scotiabank Arena"}
-                  onError={(e) => {
-                     if (!e.target.dataset.retried) {
-                        e.target.dataset.retried = 'true';
-                        if (e.target.src.endsWith('.png')) e.target.src = e.target.src.replace('.png', '.jpg');
-                        else if (e.target.src.endsWith('.jpg')) e.target.src = e.target.src.replace('.jpg', '.png');
-                     }
-                  }}
                   className="relative rounded-2xl shadow-2xl w-full h-[400px] object-cover border border-white/10"
                 />
               )}
@@ -279,6 +273,7 @@ export function LandingPage() {
                   ...venue,
                   image: venue.image_url,
                   reviewCount: venue.review_count,
+                  upcoming_events: venue.upcoming_events ?? 0,
                 }} />
               </Link>
             ))}

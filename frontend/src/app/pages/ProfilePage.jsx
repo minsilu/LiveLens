@@ -14,7 +14,9 @@ import {
   ChevronRight,
   Trash2,
   AlertTriangle,
+  PenTool
 } from "lucide-react";
+import { venues as staticVenues } from "../data/venues.js";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
@@ -26,6 +28,7 @@ export function ProfilePage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [seatViewUrls, setSeatViewUrls] = useState({});
+  const [drafts, setDrafts] = useState([]);
 
   useEffect(() => {
     const token = localStorage.getItem("access_token");
@@ -51,6 +54,15 @@ export function ProfilePage() {
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
+
+    fetch(`${API_BASE}/review-drafts/`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data)) setDrafts(data);
+      })
+      .catch(() => {});
   }, [navigate]);
 
   // Fetch seatmap pin images for each review that has seat info
@@ -242,6 +254,46 @@ export function ProfilePage() {
           </div>
         </div>
 
+        {/* ── My Drafts ── */}
+        {drafts.length > 0 && (
+          <div className="bg-gray-800/40 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6 mb-10">
+            <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+              <PenTool className="w-5 h-5 text-gray-400" />
+              My Drafts
+              <span className="text-sm text-gray-500 font-normal">
+                ({drafts.length})
+              </span>
+            </h2>
+            <div className="space-y-3">
+              {drafts.map((draft) => {
+                const draftVenueId = draft.draft_data?.venue_id;
+                const draftVenueName = draft.draft_data?.venue_name;
+                const v = staticVenues.find((x) => x.id === draftVenueId);
+                const venueName = draftVenueName || (v ? v.name : "Unknown Venue");
+                return (
+                  <Link
+                    key={draft.id}
+                    to={`/venue/${draftVenueId}?write_review=true`}
+                    className="block p-4 rounded-xl border border-gray-700 bg-gray-900/50 hover:bg-gray-700/50 hover:border-gray-500 transition-all group"
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h3 className="text-white font-medium group-hover:text-blue-400 transition-colors">
+                          Review for {venueName}
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Last updated {formatDate(draft.updated_at)}
+                        </p>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-gray-600 group-hover:text-blue-400 transition-colors" />
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* ── My Reviews ── */}
         <div className="bg-gray-800/40 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6">
           <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
@@ -284,7 +336,7 @@ export function ProfilePage() {
                   <ReviewCard
                     review={{
                       id: review.id,
-                      author: user.is_incognito
+                      author: ((review.tags ?? []).includes("anonymous") || user.is_incognito)
                         ? "Anonymous"
                         : user.email,
                       seatInfo:

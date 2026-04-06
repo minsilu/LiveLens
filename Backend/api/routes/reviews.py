@@ -67,6 +67,7 @@ class ReviewCreate(BaseModel):
     rating_value: int
     price_paid: float
     text: str
+    is_anonymous: bool = False
     images: Optional[List[str]] = None # Can be omitted during initial POST
 
 class ReviewImagesUpdate(BaseModel):
@@ -121,7 +122,8 @@ def create_review(review: ReviewCreate, user_id: str = Depends(get_current_user)
     images_json = json.dumps(review.images) if review.images else None
     
     extracted_tags = []
-    tags_json = None
+    # If anonymous, tag the review so the frontend can hide the author without any new DB column
+    tags_json = json.dumps(["anonymous"]) if review.is_anonymous else None
     
     try:
         with engine.begin() as conn:

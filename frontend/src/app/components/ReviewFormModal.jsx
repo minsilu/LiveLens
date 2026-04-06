@@ -91,7 +91,66 @@ function EventCombobox({ events, value, onChange }) {
   );
 }
 
+function VenueCombobox({ venues, value, onChange }) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  const selected = venues.find((v) => v.id === value);
+  const filtered = query.trim() === ""
+    ? venues
+    : venues.filter((v) => v.name.toLowerCase().includes(query.toLowerCase()));
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (ref.current && !ref.current.contains(e.target)) {
+        setOpen(false);
+        setQuery("");
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <div className="relative">
+        <input
+          type="text"
+          value={open ? query : (selected?.name ?? "")}
+          onChange={(e) => { setQuery(e.target.value); onChange(""); setOpen(true); }}
+          onFocus={() => { setOpen(true); setQuery(""); }}
+          placeholder="Search venues..."
+          className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10"
+        />
+        <ChevronDown className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none transition-transform ${open ? "rotate-180" : ""}`} />
+      </div>
+      {open && (
+        <div className="absolute z-20 w-full mt-1 bg-gray-800 border border-gray-600 rounded-lg shadow-xl max-h-56 overflow-y-auto">
+          {filtered.length === 0 ? (
+            <p className="px-4 py-3 text-sm text-gray-500">No venues found</p>
+          ) : (
+            filtered.map((v) => (
+              <button
+                key={v.id}
+                type="button"
+                onClick={() => { onChange(v.id); setOpen(false); setQuery(""); }}
+                className={`w-full text-left px-4 py-3 text-sm transition-colors hover:bg-gray-700 ${value === v.id ? "text-blue-400 bg-gray-700/50" : "text-gray-200"}`}
+              >
+                {v.name}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ReviewFormModal({ venueId, onClose, onSuccess }) {
+  const [activeVenueId, setActiveVenueId] = useState(venueId || "");
+  const [allDrafts, setAllDrafts] = useState([]);
+  const [apiVenues, setApiVenues] = useState([]);
   const [events, setEvents] = useState([]);
   const [seats, setSeats] = useState([]);
   const [eventId, setEventId] = useState("");
@@ -116,12 +175,24 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
 
   const isLoggedIn = !!localStorage.getItem("access_token");
 
+  // Fetch real venues from the API so we have proper DB UUIDs
   useEffect(() => {
-    fetch(`${API_BASE}/review-form/events?venue_id=${venueId}`)
+    fetch(`${API_BASE}/search/venues?limit=100`)
+      .then((r) => r.json())
+      .then((data) => setApiVenues(data.results ?? []))
+      .catch(() => setApiVenues([]));
+  }, []);
+
+  useEffect(() => {
+    if (!activeVenueId) {
+      setEvents([]);
+      return;
+    }
+    fetch(`${API_BASE}/review-form/events?venue_id=${activeVenueId}`)
       .then((r) => r.json())
       .then((data) => setEvents(Array.isArray(data) ? data : []))
       .catch(() => setEvents([]));
-  }, [venueId]);
+  }, [activeVenueId]);
 
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -131,25 +202,42 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
     })
       .then(r => r.json())
       .then(drafts => {
-        if (!Array.isArray(drafts)) return;
-        const venueDraft = drafts.find(d => d.draft_data?.venue_id === venueId);
-        if (venueDraft) {
-          setDraftId(venueDraft.id);
-          const data = venueDraft.draft_data;
-          if (data.event_id) setEventId(data.event_id);
-          if (data.section) setSection(data.section);
-          if (data.row) setRow(data.row);
-          if (data.seat_number) setSeatNumber(data.seat_number);
-          if (data.rating_visual) setRatingVisual(data.rating_visual);
-          if (data.rating_sound) setRatingSound(data.rating_sound);
-          if (data.rating_value) setRatingValue(data.rating_value);
-          if (data.price_paid) setPricePaid(data.price_paid);
-          if (data.text) setReviewText(data.text);
-          if (data.is_anonymous !== undefined) setIsAnonymous(data.is_anonymous);
-        }
+        if (Array.isArray(drafts)) setAllDrafts(drafts);
       })
       .catch(console.error);
-  }, [venueId, isLoggedIn]);
+  }, [isLoggedIn]);
+
+  // Load draft when activeVenueId changes
+  useEffect(() => {
+    if (!activeVenueId || allDrafts.length === 0) return;
+    const venueDraft = allDrafts.find(d => d.draft_data?.venue_id === activeVenueId);
+    if (venueDraft) {
+      setDraftId(venueDraft.id);
+      const data = venueDraft.draft_data;
+      if (data.event_id) setEventId(data.event_id);
+      if (data.section) setSection(data.section);
+      if (data.row) setRow(data.row);
+      if (data.seat_number) setSeatNumber(data.seat_number);
+      if (data.rating_visual) setRatingVisual(data.rating_visual);
+      if (data.rating_sound) setRatingSound(data.rating_sound);
+      if (data.rating_value) setRatingValue(data.rating_value);
+      if (data.price_paid) setPricePaid(data.price_paid);
+      if (data.text) setReviewText(data.text);
+      if (data.is_anonymous !== undefined) setIsAnonymous(data.is_anonymous);
+    } else {
+      // Reset form if they changed venue and no draft exists
+      setDraftId(null);
+      setEventId("");
+      setSection("");
+      setRow("");
+      setSeatNumber("");
+      setRatingVisual(0);
+      setRatingSound(0);
+      setRatingValue(0);
+      setPricePaid("");
+      setReviewText("");
+    }
+  }, [activeVenueId, allDrafts]);
 
   function handleFileChange(e) {
     const files = Array.from(e.target.files);
@@ -174,8 +262,11 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
     if (!token) return;
     setSavingDraft(true);
 
+    const activeVenue = apiVenues.find(v => v.id === activeVenueId);
+
     const draftData = {
-      venue_id: venueId,
+      venue_id: activeVenueId,
+      venue_name: activeVenue ? activeVenue.name : "",
       event_id: eventId,
       section,
       row,
@@ -198,7 +289,10 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
         const data = await res.json();
         setDraftId(data.draft_id);
         setDraftSaved(true);
-        setTimeout(() => setDraftSaved(false), 2000);
+        setTimeout(() => {
+          setDraftSaved(false);
+          onClose(); // Automatically close the popup upon saving the draft
+        }, 800);
       }
     } catch (err) {
       console.error(err);
@@ -214,6 +308,7 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
 
     // Validation
     const errs = [];
+    if (!activeVenueId) errs.push("Please select a venue.");
     if (!eventId) errs.push("Please select an event.");
     if (!section || !row || !seatNumber) errs.push("Please select your seat (section, row, and seat number).");
     if (!ratingVisual || !ratingSound || !ratingValue) errs.push("Please rate all three categories (Visual, Sound, Value).");
@@ -232,7 +327,7 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
       headers,
       body: JSON.stringify({
         event_id: eventId,
-        venue_id: venueId,
+        venue_id: activeVenueId,
         section,
         row,
         seat_number: seatNumber,
@@ -241,6 +336,7 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
         rating_value: ratingValue,
         price_paid: pricePaid ? parseFloat(pricePaid) : 0,
         text: reviewText,
+        is_anonymous: isAnonymous,
       }),
     });
     if (!res.ok) {
@@ -374,6 +470,15 @@ export function ReviewFormModal({ venueId, onClose, onSuccess }) {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto w-full" style={{scrollbarWidth: 'thin'}}>
+
+          {/* Venue Selection */}
+          <section className="space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500">Venue Selection</h3>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1.5">Where did you go?</label>
+              <VenueCombobox venues={apiVenues} value={activeVenueId} onChange={setActiveVenueId} />
+            </div>
+          </section>
 
           {/* Event Selection */}
           <section className="space-y-3">
