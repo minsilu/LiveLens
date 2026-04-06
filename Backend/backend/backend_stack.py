@@ -101,7 +101,7 @@ class BackendStack(Stack):
                     environment_variables={
                         "DATABASE_URL": "postgresql+pg8000://postgres:12345678@database-1.c36wyoowwijy.us-east-2.rds.amazonaws.com:5432/postgres",
                         "ZHIPUAI_API_KEY": "e736f331052e449aaa29e9007d7bb03f.gqV2FXbDO82CYi7x",
-                        "TICKETMASTER_API_KEY=nGUfzUmSweIUf5Yd1B9RpmP57gZjXYmR"
+                        "TICKETMASTER_API_KEY": "nGUfzUmSweIUf5Yd1B9RpmP57gZjXYmR",
                         # Paste your full GOOGLE_CLIENT_ID from the App Runner console below:
                         # "GOOGLE_CLIENT_ID": "113663339086-q8fsboqm2umngnp1mpmnov6jpctm5cab.apps.googleusercontent.com",
                     }
