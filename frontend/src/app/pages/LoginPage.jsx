@@ -23,7 +23,18 @@ export function LoginPage() {
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Login failed");
+      if (!res.ok) {
+        let errorMessage = data.detail;
+        if (Array.isArray(data.detail)) {
+          errorMessage = data.detail.map(e => {
+            if (e.loc && e.loc.includes("email")) {
+              return "Please enter a valid email address";
+            }
+            return e.msg;
+          }).join(", ");
+        }
+        throw new Error(errorMessage || "Login failed");
+      }
       localStorage.setItem("access_token", data.access_token);
       window.dispatchEvent(new Event("storage"));
       navigate("/profile");

@@ -426,7 +426,7 @@ export function VenuePage() {
                   id: review.id,
                   author: ((review.tags ?? []).includes("anonymous") || review.is_incognito)
                     ? "Anonymous"
-                    : (review.email ? review.email.split("@")[0] : "Verified Attendee"),
+                    : (review.email ? review.email.split("@")[0] : review.user_id),
                   seatInfo: review.section && review.row ? `Section ${review.section}, Row ${review.row}${review.seat_number ? `, Seat ${review.seat_number}` : ""}` : null,
                   date: review.created_at ?? new Date().toISOString(),
                   rating: review.overall_rating,

@@ -395,7 +395,7 @@ export function ReviewDetailPage() {
                   </div>
                   <div>
                     <p className="font-semibold text-white">
-                      {(review.tags ?? []).includes("anonymous") ? "Anonymous" : (review.email ? review.email.split("@")[0] : "Verified Attendee")}
+                      {(review.tags ?? []).includes("anonymous") ? "Anonymous" : review.user_id}
                     </p>
                     <p className="text-sm text-gray-500">{formatDate(review.created_at)}</p>
                   </div>
