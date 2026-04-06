@@ -44,11 +44,46 @@ export function ImageLightbox({ images, startIndex = 0, onClose }) {
         </>
       )}
 
-      <img
-        src={images[index]}
-        onClick={(e) => e.stopPropagation()}
-        className="max-h-[85vh] max-w-[90vw] object-contain rounded-lg"
-      />
+      {/* Support plain URL strings and seatmap objects { url, pin_x, pin_y } */}
+      {(() => {
+        const item = images[index];
+        const url  = typeof item === "string" ? item : item.url;
+        const pinX = typeof item === "object" ? item.pin_x : null;
+        const pinY = typeof item === "object" ? item.pin_y : null;
+
+        return (
+          <div
+            className="relative flex items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={url}
+              className="max-h-[85vh] max-w-[90vw] object-contain rounded-lg block"
+            />
+            {pinX != null && pinY != null && (
+              <div
+                style={{
+                  position: "absolute",
+                  left: `${(pinX / 1024) * 100}%`,
+                  top:  `${(pinY / 768)  * 100}%`,
+                  transform: "translate(-50%, -50%)",
+                  pointerEvents: "none",
+                }}
+              >
+                <div style={{
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "50%",
+                  background: "rgba(220,38,38,0.92)",
+                  border: "3px solid white",
+                  boxShadow: "0 0 10px rgba(220,38,38,0.8)",
+                  animation: "pulse-pin 2s ease-in-out infinite",
+                }} />
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {images.length > 1 && (
         <div className="absolute bottom-4 flex gap-1.5">
@@ -57,6 +92,13 @@ export function ImageLightbox({ images, startIndex = 0, onClose }) {
           ))}
         </div>
       )}
+
+      <style>{`
+        @keyframes pulse-pin {
+          0%, 100% { transform: scale(1);    }
+          50%      { transform: scale(1.08); }
+        }
+      `}</style>
     </div>,
     document.body
   );

@@ -113,8 +113,8 @@ export function ReviewDetailPage() {
   const [error, setError] = useState(null);
   const [lightboxIndex, setLightboxIndex] = useState(null);
 
-  // Seat view image state
-  const [seatViewUrl, setSeatViewUrl] = useState(null);
+  // Seat view image state — image_url + optional pin_x/pin_y
+  const [seatViewData, setSeatViewData] = useState(null); // { image_url, pin_x, pin_y }
   const [seatViewLoading, setSeatViewLoading] = useState(false);
 
   // Sub-reviews state
@@ -147,7 +147,7 @@ export function ReviewDetailPage() {
     if (!venue_name || !section || !row || !seat_number) return;
 
     setSeatViewLoading(true);
-    setSeatViewUrl(null);
+    setSeatViewData(null);
 
     const params = new URLSearchParams({ venue_name, section, row, seat_number });
     fetch(`${API_BASE}/ai/seat-view-image?${params}`)
@@ -155,7 +155,7 @@ export function ReviewDetailPage() {
         if (!r.ok) throw new Error("Failed");
         return r.json();
       })
-      .then((data) => setSeatViewUrl(data.image_url))
+      .then((data) => setSeatViewData(data))
       .catch(() => {})
       .finally(() => setSeatViewLoading(false));
   }, [review]);
@@ -270,7 +270,13 @@ export function ReviewDetailPage() {
   ].filter(Boolean).join(", ") || null;
 
   const allLightboxImages = [...images];
-  if (seatViewUrl) allLightboxImages.push(seatViewUrl);
+  if (seatViewData?.image_url) {
+    allLightboxImages.push({
+      url:   seatViewData.image_url,
+      pin_x: seatViewData.pin_x,
+      pin_y: seatViewData.pin_y,
+    });
+  }
 
   const userEmailShort = (email) => {
     if (!email) return "Anonymous";
@@ -300,7 +306,7 @@ export function ReviewDetailPage() {
 
             {/* 2D Seat View */}
             {seatViewLoading && <SeatViewSkeleton />}
-            {seatViewUrl && !seatViewLoading && (
+            {seatViewData?.image_url && !seatViewLoading && (
               <div className="bg-gray-800/40 backdrop-blur-sm rounded-2xl border border-gray-700/50 p-5 overflow-hidden">
                 <div className="flex items-center gap-2 mb-3">
                   <Crosshair className="w-4 h-4 text-blue-400" />
@@ -308,15 +314,49 @@ export function ReviewDetailPage() {
                     Seat View — {seatLabel}
                   </h2>
                   <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/25 font-medium">
-                    AI Generated
+                    2D Map
                   </span>
                 </div>
-                <img
-                  src={seatViewUrl}
-                  alt={`2D seat map showing ${seatLabel} at ${review.venue_name}`}
+                {/* Seatmap image with CSS-positioned pin overlay */}
+                <div
+                  className="relative w-full cursor-pointer rounded-xl overflow-hidden border border-gray-700 hover:border-blue-500 transition-colors duration-200"
                   onClick={() => setLightboxIndex(images.length)}
-                  className="w-full rounded-xl cursor-pointer border border-gray-700 hover:border-blue-500 transition-colors duration-200"
-                />
+                >
+                  <img
+                    src={seatViewData.image_url}
+                    alt={`Seatmap for ${review.venue_name}`}
+                    className="w-full block"
+                  />
+                  {seatViewData.pin_x != null && seatViewData.pin_y != null && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: `${(seatViewData.pin_x / 1024) * 100}%`,
+                        top:  `${(seatViewData.pin_y / 768)  * 100}%`,
+                        transform: "translate(-50%, -50%)",
+                        pointerEvents: "none",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: "16px",
+                          height: "16px",
+                          borderRadius: "50%",
+                          background: "rgba(220,38,38,0.92)",
+                          border: "2px solid white",
+                          boxShadow: "0 0 8px rgba(220,38,38,0.7)",
+                          animation: "pulse-pin 2s ease-in-out infinite",
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+                <style>{`
+                  @keyframes pulse-pin {
+                    0%, 100% { transform: scale(1);    }
+                    50%      { transform: scale(1.08); }
+                  }
+                `}</style>
               </div>
             )}
 

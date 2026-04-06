@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import Any, Dict, Union, Optional
 from sqlalchemy import text
 from ..database import engine
-from ..utils.zhipu_client import generate_seat_view_image
+from ..utils.seatmap_client import get_seatmap_data
 
 try:
     from zhipuai import ZhipuAI
@@ -586,22 +586,20 @@ async def get_seat_view_image(
     seat_number: str,
 ):
     """
-    Generate a 2D seat-view image for a specific seat at a venue using AI.
+    Return the Ticketmaster seatmap PNG for a venue together with the pixel
+    coordinates of the requested section so the frontend can draw the pin.
 
-    Query Parameters:
-    - venue_name: Name of the venue (e.g. "Scotiabank Arena")
-    - section: Section identifier (e.g. "1")
-    - row: Row identifier (e.g. "F")
-    - seat_number: Seat number (e.g. "19")
+    Query params: venue_name, section, row, seat_number
 
-    Returns:
-    { "image_url": "https://..." }
+    Response:
+    {
+        "image_url": "https://...",  // TM PNG (1024x768)
+        "pin_x": 512,               // pixel x, or null if section unknown
+        "pin_y": 300                // pixel y, or null if section unknown
+    }
     """
-    image_url = generate_seat_view_image(venue_name, section, row, seat_number)
-    if not image_url:
-        raise HTTPException(
-            status_code=502,
-            detail="Failed to generate seat view image. Please try again later.",
-        )
-    return {"image_url": image_url}
+    data = get_seatmap_data(venue_name, section)
+    if not data:
+        raise HTTPException(status_code=502, detail="Seatmap not available for this venue.")
+    return data
 
