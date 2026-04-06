@@ -394,7 +394,9 @@ export function ReviewDetailPage() {
                     <User className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <p className="font-semibold text-white">Verified Attendee</p>
+                    <p className="font-semibold text-white">
+                      {(review.tags ?? []).includes("anonymous") ? "Anonymous" : (review.email ? review.email.split("@")[0] : "Verified Attendee")}
+                    </p>
                     <p className="text-sm text-gray-500">{formatDate(review.created_at)}</p>
                   </div>
                   <div className="ml-auto text-right">

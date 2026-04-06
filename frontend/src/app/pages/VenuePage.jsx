@@ -3,7 +3,7 @@ import { useParams, useLocation, Link } from "react-router";
 import { venues as staticVenues } from "../data/venues.js";
 import { ReviewCard } from "../components/ReviewCard.jsx";
 import { ReviewFormModal } from "../components/ReviewFormModal.jsx";
-import { Star, MapPin, ArrowLeft, ChevronDown, PenLine, Box, CheckCircle, Loader2 } from "lucide-react";
+import { Star, MapPin, ArrowLeft, ChevronDown, PenLine, Box, CheckCircle, Loader2, CalendarDays, Ticket, Music2 } from "lucide-react";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import { Venue3DModal } from "../components/Venue3DModal.jsx";
 
@@ -25,7 +25,11 @@ export function VenuePage() {
   const [venueIndex, setVenueIndex] = useState(location.state?.index ?? 0);
   const [loading, setLoading] = useState(!venue);
   const [reviews, setReviews] = useState([]);
-  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [events, setEvents] = useState([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
+  const [showReviewForm, setShowReviewForm] = useState(
+    new URLSearchParams(window.location.search).get('write_review') === 'true'
+  );
   const [reviewsKey, setReviewsKey] = useState(0);
   const [showSuccess, setShowSuccess] = useState(false);
   const successTimerRef = useRef(null);
@@ -74,6 +78,15 @@ export function VenuePage() {
         setSections(unique);
       })
       .catch(() => setSections([]));
+  }, [venueId]);
+
+  useEffect(() => {
+    setEventsLoading(true);
+    fetch(`${API_BASE}/search/events?venue_id=${venueId}&sort_by=event_date&order=asc&limit=20`)
+      .then((r) => r.json())
+      .then((data) => setEvents(data.results ?? []))
+      .catch(() => setEvents([]))
+      .finally(() => setEventsLoading(false));
   }, [venueId]);
 
   useEffect(() => {
@@ -137,7 +150,7 @@ export function VenuePage() {
     );
   }
 
-  const image = venue.image ?? staticVenues[venueIndex % staticVenues.length].image;
+  const image = venue.image_url ?? venue.image ?? staticVenues[venueIndex % staticVenues.length].image;
   const category = venue.category ?? parseFirstTag(venue.tags);
   const location_str = venue.address ?? venue.city ?? "—";
 
@@ -212,6 +225,77 @@ export function VenuePage() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Upcoming Events */}
+        <div className="bg-gray-800/40 backdrop-blur-sm rounded-lg shadow-2xl p-8 border border-gray-700/50 mb-8">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="bg-purple-500/20 p-2 rounded-lg border border-purple-500/20">
+              <CalendarDays className="w-5 h-5 text-purple-400" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-semibold text-white">Upcoming Events</h2>
+              <p className="text-gray-400 text-sm mt-0.5">{events.length > 0 ? `${events.length} event${events.length !== 1 ? 's' : ''} scheduled` : 'No upcoming events'}</p>
+            </div>
+          </div>
+
+          {eventsLoading ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="w-6 h-6 text-gray-500 animate-spin" />
+            </div>
+          ) : events.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <Music2 className="w-10 h-10 text-gray-600 mb-3" />
+              <p className="text-gray-500 text-sm">No upcoming events yet. Check back soon!</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {events.map((event) => {
+                const date = event.event_date
+                  ? new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                  : 'TBD';
+                const isPast = event.event_date && new Date(event.event_date) < new Date(new Date().toDateString());
+                return (
+                  <div
+                    key={event.id}
+                    className={`group relative rounded-xl border p-4 flex flex-col gap-3 transition-all duration-200 hover:-translate-y-0.5 ${
+                      isPast
+                        ? 'bg-gray-800/30 border-gray-700/40 opacity-60'
+                        : 'bg-gray-800/60 border-gray-700/60 hover:border-purple-500/40 hover:bg-gray-800/80 hover:shadow-[0_4px_20px_rgba(168,85,247,0.1)]'
+                    }`}
+                  >
+                    {isPast && (
+                      <span className="absolute top-3 right-3 text-[10px] font-semibold uppercase tracking-wider text-gray-500 bg-gray-700/60 px-2 py-0.5 rounded-full">Past</span>
+                    )}
+                    <div className="flex items-start gap-3">
+                      <div className="bg-purple-500/15 border border-purple-500/20 rounded-lg p-2 shrink-0">
+                        <Music2 className="w-4 h-4 text-purple-400" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-white font-semibold text-sm leading-snug truncate" title={event.artist}>{event.artist}</p>
+                        <p className="text-gray-400 text-xs mt-0.5 truncate" title={event.name}>{event.name.split(' at ')[0]}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-gray-400 text-xs">
+                      <CalendarDays className="w-3.5 h-3.5 shrink-0 text-purple-400/70" />
+                      <span>{date}</span>
+                    </div>
+                    {!isPast && event.ticket_url && (
+                      <a
+                        href={event.ticket_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-auto flex items-center justify-center gap-2 w-full py-2 rounded-lg bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/20 hover:border-purple-500/40 text-purple-300 hover:text-purple-200 text-xs font-medium transition-all"
+                      >
+                        <Ticket className="w-3.5 h-3.5" />
+                        Get Tickets
+                      </a>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div className="bg-gray-800/40 backdrop-blur-sm rounded-lg shadow-2xl p-8 border border-gray-700/50">
@@ -340,7 +424,7 @@ export function VenuePage() {
                 key={review.id}
                 review={{
                   id: review.id,
-                  author: review.is_incognito
+                  author: ((review.tags ?? []).includes("anonymous") || review.is_incognito)
                     ? "Anonymous"
                     : (review.email ? review.email.split("@")[0] : "Verified Attendee"),
                   seatInfo: review.section && review.row ? `Section ${review.section}, Row ${review.row}${review.seat_number ? `, Seat ${review.seat_number}` : ""}` : null,

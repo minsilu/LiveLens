@@ -8,6 +8,178 @@ from datetime import datetime, timedelta
 
 router = APIRouter()
 
+EXTRA_VENUES = [
+    {"name": "Red Rocks Amphitheatre",   "city": "Morrison, CO",    "capacity": 9525,  "tags": '[\"outdoor\", \"rock\", \"amphitheatre\"]'},
+    {"name": "Wembley Stadium",          "city": "London",          "capacity": 90000, "tags": '[\"stadium\", \"concerts\", \"sports\"]'},
+    {"name": "Sydney Opera House",       "city": "Sydney",          "capacity": 5738,  "tags": '[\"classical\", \"opera\", \"iconic\"]'},
+    {"name": "Radio City Music Hall",    "city": "New York",        "capacity": 5960,  "tags": '[\"theatre\", \"concerts\", \"broadway\"]'},
+    {"name": "Hollywood Bowl",           "city": "Los Angeles",     "capacity": 17500, "tags": '[\"outdoor\", \"classical\", \"summer\"]'},
+    {"name": "Barclays Center",          "city": "Brooklyn, NY",    "capacity": 17732, "tags": '[\"arena\", \"sports\", \"concerts\"]'},
+    {"name": "United Center",            "city": "Chicago, IL",     "capacity": 20917, "tags": '[\"sports\", \"concerts\", \"arena\"]'},
+    {"name": "Bridgestone Arena",        "city": "Nashville, TN",   "capacity": 17500, "tags": '[\"country\", \"concerts\", \"sports\"]'},
+    {"name": "Rogers Centre",            "city": "Toronto",         "capacity": 53500, "tags": '[\"stadium\", \"baseball\", \"concerts\"]'},
+    {"name": "Palais des sports de Paris","city": "Paris",          "capacity": 15000, "tags": '[\"arena\", \"concerts\", \"sports\"]'},
+]
+
+@router.post("/add-venues")
+def add_extra_venues():
+    """Seed 10 additional iconic real-world venues into the database (idempotent)."""
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    try:
+        venues_data = [
+            {
+                "id": str(uuid.uuid4()),
+                "name": v["name"],
+                "city": v["city"],
+                "capacity": v["capacity"],
+                "tags": v["tags"],
+                "seat_map_2d_url": None,
+            }
+            for v in EXTRA_VENUES
+        ]
+        names = [v["name"] for v in EXTRA_VENUES]
+        placeholders = ", ".join(f":n{i}" for i in range(len(names)))
+        name_params = {f"n{i}": n for i, n in enumerate(names)}
+        with engine.begin() as conn:
+            conn.execute(
+                text("INSERT INTO Venues (id, name, city, capacity, tags, seat_map_2d_url) VALUES (:id, :name, :city, :capacity, :tags, :seat_map_2d_url) ON CONFLICT DO NOTHING"),
+                venues_data,
+            )
+            inserted = conn.execute(
+                text(f"SELECT COUNT(*) FROM Venues WHERE name IN ({placeholders})"),
+                name_params,
+            ).scalar()
+        return {"message": f"Extra venues seeded. {inserted} venue(s) now in DB matching this set."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+@router.post("/add-venue-events")
+def add_venue_events():
+    """
+    Seed 4-6 realistic mock events for every venue currently lacking events.
+    Idempotent — venues that already have events are skipped.
+    """
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database not configured")
+
+    # Genre-appropriate event catalog keyed by first tag
+    EVENT_CATALOG = {
+        "outdoor":      [("Foo Fighters: Everything or Nothing",    "Rock",        "Foo Fighters"),
+                         ("Kendrick Lamar: Grand National Tour",    "Hip-Hop",     "Kendrick Lamar"),
+                         ("Jack Johnson: Summerville Sessions",     "Acoustic",    "Jack Johnson"),
+                         ("Billie Eilish: Hit Me Hard and Soft",   "Pop",         "Billie Eilish"),
+                         ("Pearl Jam: Dark Matter Tour",            "Rock",        "Pearl Jam"),
+                         ("Dave Matthews Band: Summer Tour 2026",  "Rock",        "Dave Matthews Band")],
+        "rock":         [("Foo Fighters: Everything or Nothing",    "Rock",        "Foo Fighters"),
+                         ("Pearl Jam: Dark Matter Tour",            "Rock",        "Pearl Jam"),
+                         ("Twenty One Pilots: Clancy World Tour",  "Alternative", "Twenty One Pilots"),
+                         ("Metallica: M72 World Tour",              "Metal",       "Metallica"),
+                         ("Green Day: Saviors Tour",                "Rock",        "Green Day"),
+                         ("Arctic Monkeys: The Car Tour",           "Rock",        "Arctic Monkeys")],
+        "classical":    [("Lang Lang: Piano Gala",                  "Classical",   "Lang Lang"),
+                         ("Yo-Yo Ma: Cello Masterworks",            "Classical",   "Yo-Yo Ma"),
+                         ("Vienna Philharmonic: World Tour",        "Classical",   "Vienna Philharmonic"),
+                         ("Hans Zimmer Live: Film Scores",          "Cinematic",   "Hans Zimmer"),
+                         ("Ludovico Einaudi: Islands Tour",         "Contemporary","Ludovico Einaudi"),
+                         ("Max Richter: Sleep Reimagined",          "Ambient",     "Max Richter")],
+        "opera":        [("La Traviata: Opera Gala",                "Opera",       "Metropolitan Opera"),
+                         ("Carmen: World Tour Production",          "Opera",       "Royal Opera House"),
+                         ("The Magic Flute: Concert Version",       "Opera",       "Vienna State Opera"),
+                         ("Puccini Night: Arias & Overtures",      "Opera",       "International Opera Co."),
+                         ("Andrea Bocelli: World Tour 2026",        "Opera/Pop",   "Andrea Bocelli"),
+                         ("Cecilia Bartoli: Sacrificium",           "Baroque",     "Cecilia Bartoli")],
+        "theatre":      [("Hamilton: The Musical",                  "Broadway",    "Lin-Manuel Miranda"),
+                         ("Wicked: Revival Tour",                   "Broadway",    "Broadway Touring Co."),
+                         ("The Phantom of the Opera: 40th Anniv.", "Broadway",    "Andrew Lloyd Webber"),
+                         ("Billy Joel: Piano Man Residency",        "Pop/Rock",    "Billy Joel"),
+                         ("Elton John: Farewell Yellow Brick Road", "Pop",         "Elton John"),
+                         ("Bruce Springsteen: Darkness Tour",       "Rock",        "Bruce Springsteen")],
+        "stadium":      [("Taylor Swift: The Eras Tour",            "Pop",         "Taylor Swift"),
+                         ("Beyoncé: Renaissance World Tour",        "R&B/Pop",     "Beyoncé"),
+                         ("Ed Sheeran: Mathematics Tour",           "Pop",         "Ed Sheeran"),
+                         ("Coldplay: Music of the Spheres",         "Pop/Rock",    "Coldplay"),
+                         ("Bad Bunny: Most Wanted Tour",            "Latin/Trap",  "Bad Bunny"),
+                         ("The Rolling Stones: Hackney Diamonds",   "Rock",        "The Rolling Stones")],
+        "country":      [("Morgan Wallen: One Thing at a Time Tour","Country",     "Morgan Wallen"),
+                         ("Luke Combs: Gettin' Old Tour",           "Country",     "Luke Combs"),
+                         ("Zac Brown Band: The Comeback Story",     "Country/Rock","Zac Brown Band"),
+                         ("Carrie Underwood: Denim & Rhinestones",  "Country",     "Carrie Underwood"),
+                         ("Chris Stapleton: All-American Road Show","Country/Rock","Chris Stapleton"),
+                         ("Kacey Musgraves: Deeper Well Tour",      "Country/Pop", "Kacey Musgraves")],
+        "arena":        [("Drake: It's All A Blur — Big As The What?","Hip-Hop",  "Drake"),
+                         ("The Weeknd: After Hours til Dawn",       "R&B/Pop",     "The Weeknd"),
+                         ("Post Malone: F-1 Trillion Tour",         "Pop/Hip-Hop", "Post Malone"),
+                         ("Dua Lipa: Radical Optimism Tour",        "Pop/Dance",   "Dua Lipa"),
+                         ("SZA: SOS Tour 2026",                     "R&B",         "SZA"),
+                         ("Bruno Mars: An Evening with Bruno Mars", "Pop/R&B",     "Bruno Mars")],
+    }
+    DEFAULT_EVENTS = [
+        ("Taylor Swift: The Eras Tour",  "Pop",         "Taylor Swift"),
+        ("Coldplay: Music of the Spheres","Pop/Rock",   "Coldplay"),
+        ("The Weeknd: After Hours",      "R&B/Pop",     "The Weeknd"),
+        ("Dua Lipa: Radical Optimism",   "Pop/Dance",   "Dua Lipa"),
+        ("Drake: It's All A Blur",       "Hip-Hop",     "Drake"),
+    ]
+
+    try:
+        with engine.begin() as conn:
+            # Find venues that have zero events
+            empty_venues = conn.execute(text("""
+                SELECT v.id, v.name, v.tags FROM Venues v
+                WHERE NOT EXISTS (SELECT 1 FROM Events e WHERE e.venue_id = v.id)
+            """)).fetchall()
+
+            if not empty_venues:
+                return {"message": "All venues already have events — nothing to do."}
+
+            events_data = []
+            today = datetime.now().date()
+
+            for v_id, v_name, v_tags in empty_venues:
+                # Pick event catalog based on first tag
+                first_tag = "arena"
+                try:
+                    import json as _json
+                    parsed = _json.loads(v_tags) if v_tags else []
+                    first_tag = parsed[0] if parsed else "arena"
+                except Exception:
+                    pass
+
+                catalog = EVENT_CATALOG.get(first_tag, DEFAULT_EVENTS)
+                picks = random.sample(catalog, min(5, len(catalog)))
+
+                # Spread events across the next 9 months, at least 14 days apart
+                gap_days = (9 * 30) // len(picks)
+                offset = random.randint(7, 30)
+                for show_name, genre, artist in picks:
+                    event_date = today + timedelta(days=offset)
+                    events_data.append({
+                        "id": str(uuid.uuid4()),
+                        "venue_id": str(v_id),
+                        "name": f"{show_name} at {v_name}",
+                        "artist": artist,
+                        "genre": genre,
+                        "event_date": event_date,
+                        "ticket_url": "https://ticketmaster.com",
+                    })
+                    offset += gap_days + random.randint(0, 14)
+
+            conn.execute(
+                text("INSERT INTO Events (id, venue_id, name, artist, genre, event_date, ticket_url) "
+                     "VALUES (:id, :venue_id, :name, :artist, :genre, :event_date, :ticket_url) "
+                     "ON CONFLICT DO NOTHING"),
+                events_data,
+            )
+
+        return {
+            "message": f"Seeded {len(events_data)} events across {len(empty_venues)} venue(s).",
+            "venues_updated": [row[1] for row in empty_venues],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
 @router.post("/generate")
 def generate_mock_data():
     """Inject ~1000 interrelated mock database records (Users, Venues, Events, Seats, Reviews)"""
