@@ -478,5 +478,10 @@ def generate_seat_view_image(
                     logger.info(f"Pinned seatmap uploaded and cached: {s3_url}")
                     return s3_url
 
-    logger.info(f"Seatmap pin not available for {venue_name} section {section}")
+    # Fallback: return the base seatmap PNG without a pin
+    if seatmap and seatmap.get("png_url"):
+        logger.info(f"Returning base seatmap (no pin) for {venue_name} section {section}")
+        return seatmap["png_url"]
+
+    logger.info(f"Seatmap not available for {venue_name} section {section}")
     return None
