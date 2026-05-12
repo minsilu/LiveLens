@@ -161,7 +161,7 @@ Use the following details to configure your connection:
 - Port: 5432
 - Database Name: postgres
 - Username: postgres
-- Password: 12345678 (Contact Minsi for the master password)
+- Password: (Contact Minsi for the master password)
 
 Inside `.env`, just set your DATABASE_URL=postgresql://postgres:12345678@database-1.c36wyoowwijy.us-east-2.rds.amazonaws.com:5432/postgres
 
